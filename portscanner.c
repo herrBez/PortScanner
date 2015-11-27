@@ -1,6 +1,9 @@
 /*
- * client.c
+ * portscanner.c
+ * Main File of the project portscanner at the university of Innsbruck
+ * Course: Angewandte Informationssicherheit
  *
+ * 
  */
 
 //#include <arpa/inet.h>
@@ -13,18 +16,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-void parse(char *url, char *parsed[2]);
-char *createRequest(char *pfad, char *hostname);
+#include <regex.h>        
+
+
 
 int main(int argc, char *argv[]) {
 	if (argc != 2) {
-		fprintf(stderr, "Usage: %s [url]", argv[0]);
+		fprintf(stderr, "Usage: %s [url]\n", argv[0]);
 		exit(EXIT_FAILURE);
-	}
+	}	
+	int i = 0;
 	char *url = argv[1];
-	char *relativePath;
-	char *request;
-	char buffer[1024];
     struct sockaddr_in server;
 	int mysocket;
 	struct hostent *hostname;
@@ -41,7 +43,7 @@ int main(int argc, char *argv[]) {
     server.sin_family = AF_INET;
     
     
-    for(int i=0; i<65536; i++){
+    for(i=0; i<0xFFFF; i++){
 		server.sin_port = htons(i);
 		if(connect(mysocket, (struct sockaddr *)&server, sizeof(server))<0){
 			//perror("connect");
