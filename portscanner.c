@@ -21,7 +21,7 @@ void printHelp(char * program_name){
 	printf("\t -h \t print this help and exit\n");
 	printf("\t -p \t specify a port range in form min-max (Defualt 1-65535)\n");
 	printf("\t -u \t specify a url to scan (Default localhost)\n");
-	printf("\t -v \t set verbosity of output");
+	printf("\t -v \t verbose output");
 	printf("\n\nAuthors: Simon Targa, Mirko Bez\n");
 	exit(EXIT_SUCCESS);
 }
@@ -96,8 +96,9 @@ int main(int argc, char *argv[]) {
 
     memcpy( (char *)&server.sin_addr, hostname->h_addr_list[0], hostname->h_length);
     server.sin_family = AF_INET;
-    setbuf(stdout, NULL);
-    printf("\n");
+    
+    if(p->verbose)
+		printf("\n");
 
 	
 	int interval = p->max_port - p->min_port + 1;//Because of <=
@@ -115,15 +116,18 @@ int main(int argc, char *argv[]) {
 			//return EXIT_FAILURE;
 		}
 		else{
-			printf("\nTCP - Port %d is open\n", i);
+			if(p->verbose)
+				printf("\n");
+			printf("TCP - Port %d is open\n", i);
 			close(mysocket);
 			mysocket = socket(AF_INET, SOCK_STREAM, 0);
 			p->counter++;
 			sleep(1);
 		}
 	
-	}
-	printf("\n");
+	} 
+	if(p->verbose)
+		printf("\n");
 	
 	
 	/* Printing results */
