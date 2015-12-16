@@ -21,8 +21,9 @@ void printHelp(char * program_name){
 	printf("\t -h \t print this help and exit\n");
 	printf("\t -p \t specify a port range in form min-max (Defualt 1-65535)\n");
 	printf("\t -u \t specify a url to scan (Default localhost)\n");
-	printf("\t -v \t verbose output");
-	printf("\n\nAuthors: Simon Targa, Mirko Bez\n");
+	printf("\t -v \t verbose output\n");
+	printf("\t -s \t perform a Syn scan\n");
+	printf("\nAuthors: Simon Targa, Mirko Bez\n");
 	exit(EXIT_SUCCESS);
 }
 
@@ -50,12 +51,14 @@ void parsePort(char * ports, portscanner * p){
 
 void getOptions(int argc, char * argv[], portscanner * p){
 	int opt;
-	while((opt = getopt(argc, argv, "phuv")) != -1) {
+	while((opt = getopt(argc, argv, "phuvsi")) != -1) {
 		switch(opt){
 			case 'p': parsePort(argv[optind], p); break;
 			case 'h': printHelp(argv[0]); break;
 			case 'u': free(p->host_name); p->host_name = strdup(argv[optind]); break;
-			case 'v': p->verbose = 1;
+			case 'v': p->verbose = 1; break;
+			case 's': p->method = 1; break;
+			case 'i': p->method = 2; break;
 		}
 	}
 }
@@ -63,22 +66,18 @@ void getOptions(int argc, char * argv[], portscanner * p){
 portscanner * newPortScanner(){
 	portscanner * p = malloc(sizeof(portscanner));
 	p->min_port = 1;
-	p->max_port = 65535;
+	p->max_port = 1024;
 	p->host_name = strdup("localhost");
 	p->verbose = 0;
 	p->counter = 0;
+	p->method = 0; //TCP-Scanner
 	return p;
 }
 
 
 
-int main(int argc, char *argv[]) {
-	
-
-	portscanner * p = newPortScanner();
-	getOptions(argc, argv, p);
-	
-	printf("Scanning %s \n", p->host_name);
+void TCPScan(portscanner * p){
+	printf("Scanning %s using TCP Scan\n", p->host_name);
 	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
 
 	
@@ -92,6 +91,7 @@ int main(int argc, char *argv[]) {
     memset(&server, 0, sizeof (server));
 	/** N.B. GETHOSTBYNAME IS OBSOLETE */
     hostname = gethostbyname(p->host_name);
+	printf("ADDRR[%d] ?? %s\n", hostname->h_length, hostname->h_addr_list[0]);
 
 
     memcpy( (char *)&server.sin_addr, hostname->h_addr_list[0], hostname->h_length);
@@ -133,6 +133,36 @@ int main(int argc, char *argv[]) {
 	/* Printing results */
 	printf("\n%d Ports in range [%d,%d] are open on Host '%s'\n", p->counter, p->min_port, p->max_port, p->host_name);
 
+	
+}
+
+
+
+void SYNScan(portscanner * p){
+	printf("Scanning %s using SYN Scan\n", p->host_name);
+	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
+	/* CREATING THE RAW SOCKET */
+	//int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
+}
+
+void IdleScan(portscanner * p){
+}
+
+
+
+int main(int argc, char *argv[]) {
+	
+
+	portscanner * p = newPortScanner();
+	getOptions(argc, argv, p);
+	switch(p->method){
+		case 0: printf("I will perform a TCP scan\n"); TCPScan(p); break; 
+		case 1: printf("I will perform a SYN scan\n"); SYNScan(p); break;
+		case 2: printf("I will perform an Idle scan\n"); IdleScan(p); break;
+		default: printf("Method not recognized. Goodbye."); return EXIT_FAILURE;
+	}
+	
+	
 	/* free allocated memory */
 	destroyPortScanner(p);
 	return EXIT_SUCCESS;
