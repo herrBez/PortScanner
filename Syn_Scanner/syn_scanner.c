@@ -7,7 +7,6 @@
 #include<stdlib.h> //for exit(0);
 #include<sys/socket.h>
 #include<errno.h> //For errno - the error number
-//#include<pthread.h>
 #include<netdb.h> //hostend
 #include<arpa/inet.h>
 #include<netinet/tcp.h>   //Provides declarations for tcp header
@@ -18,6 +17,7 @@ void process_packet(unsigned char* , int);
 unsigned short csum(unsigned short * , int );
 char * hostname_to_ip(char * );
 int get_local_ip (char *);
+void PortScan (int startPort, int endPort, char* target);
  
 struct pseudo_header    //needed for checksum calculation
 {
@@ -34,7 +34,23 @@ struct in_addr dest_ip;
  
 int main(int argc, char *argv[])
 {
-    //Create a raw socket
+    char *target = argv[1];
+     
+    if(argc < 2)
+    {
+        printf("Please specify a hostname \n");
+        exit(1);
+    }
+     
+     PortScan(1, 1024, "127.0.0.1");
+          
+    return 0;
+}
+
+
+void PortScan (int startPort, int endPort, char* target){
+	
+	 //Create a raw socket
     int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
     if(s < 0)
     {
@@ -45,7 +61,8 @@ int main(int argc, char *argv[])
     {
         printf("Socket created.\n");
     }
-         
+    
+    
     //Datagram to represent the packet
     char datagram[4096];    
      
@@ -57,15 +74,8 @@ int main(int argc, char *argv[])
      
     struct sockaddr_in  dest;
     struct pseudo_header psh;
-     
-    char *target = argv[1];
-     
-    if(argc < 2)
-    {
-        printf("Please specify a hostname \n");
-        exit(1);
-    }
-     
+    
+    
     if( inet_addr( target ) != -1)
     {
         dest_ip.s_addr = inet_addr( target );
@@ -134,26 +144,14 @@ int main(int argc, char *argv[])
         printf ("Error setting IP_HDRINCL. Error number : %d . Error message : %s \n" , errno , strerror(errno));
         exit(0);
     }
-     
-    printf("Starting sniffer thread...\n");
-    char *message1 = "Thread 1";
-    int  iret1;
     
-    /*
-    pthread_t sniffer_thread;
- 
-    if( pthread_create( &sniffer_thread , NULL ,  receive_ack , (void*) message1) < 0)
-    {
-        printf ("Could not create sniffer thread. Error number : %d . Error message : %s \n" , errno , strerror(errno));
-        exit(0);
-    }*/
- 
+    
     printf("Starting to send syn packets\n");
      
     int port;
     dest.sin_family = AF_INET;
     dest.sin_addr.s_addr = dest_ip.s_addr;
-    for(port = 80 ; port < 81 ; port++)
+    for(port = startPort ; port < endPort ; port++)
     {
         tcph->dest = htons ( port );
         tcph->check = 0; // if you set a checksum to zero, your kernel's IP stack should fill in the correct checksum during transmission
@@ -176,87 +174,21 @@ int main(int argc, char *argv[])
         }
         
         
-          struct sockaddr saddr;
-           int saddr_size, data_size;
-            saddr_size = sizeof saddr;
+         struct sockaddr saddr;
+        int saddr_size, data_size;
+        saddr_size = sizeof saddr;
 
      
-    unsigned char *buffer = (unsigned char *)malloc(65536); //Its Big
+		unsigned char *buffer = (unsigned char *)malloc(65536); //Its Big
         
          data_size = recvfrom(s , buffer , 65536 , 0 , &saddr , &saddr_size);
-		        process_packet(buffer , data_size);
+		 process_packet(buffer , data_size);
+	 }
+	
+}
 
-        
-        
-        
-        
-        
-        
-    }
-     
-    //pthread_join( sniffer_thread , NULL);
-    printf("%d" , iret1);
-     
-    return 0;
-}
  
-/*
-    Method to sniff incoming packets and look for Ack replies
-*/
-/*
-void * receive_ack( void *ptr )
-{
-    //Start the sniffer thing
-    start_sniffer();
-}*/
- 
-int start_sniffer()
-{
-    int sock_raw;
-     
-    int saddr_size , data_size;
-    struct sockaddr saddr;
-     
-    unsigned char *buffer = (unsigned char *)malloc(65536); //Its Big!
-     
-    printf("Sniffer initialising...\n");
-    fflush(stdout);
-     
-    //Create a raw socket that shall sniff
-    sock_raw = socket(AF_INET , SOCK_RAW , IPPROTO_TCP);
-     
-    if(sock_raw < 0)
-    {
-        printf("Socket Error\n");
-        fflush(stdout);
-        return 1;
-    }
-     
-    saddr_size = sizeof saddr;
-     
-   //for (int i=0; i<10; i++)
-    //{
-        //Receive a packet
-        printf("hallo\n");
-        data_size = recvfrom(sock_raw , buffer , 65536 , 0 , &saddr , &saddr_size);
-         printf("blub\n");
-        if(data_size <0 )
-        {
-            printf("Recvfrom error , failed to get packets\n");
-            fflush(stdout);
-            return 1;
-        }
-         
-        //Now process the packet
-        process_packet(buffer , data_size);
-    //}
-     
-    close(sock_raw);
-    printf("Sniffer finished.");
-    fflush(stdout);
-    return 0;
-}
- 
+
 void process_packet(unsigned char* buffer, int size)
 {
     //Get the IP Header part of this packet
