@@ -18,6 +18,8 @@ unsigned short csum(unsigned short * , int );
 char * hostname_to_ip(char * );
 int get_local_ip (char *);
 void PortScan (int startPort, int endPort, char* target);
+
+
  
 struct pseudo_header    //needed for checksum calculation
 {
@@ -31,6 +33,9 @@ struct pseudo_header    //needed for checksum calculation
 };
  
 struct in_addr dest_ip;
+
+void sendPackage(int port,  struct tcphdr *tcph, struct pseudo_header psh,  struct sockaddr_in  dest, int s, char* datagram, char * source_ip);
+
  
 int main(int argc, char *argv[])
 {
@@ -42,7 +47,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
      
-     PortScan(1, 1024, "127.0.0.1");
+     PortScan(1, 6000, target);
           
     return 0;
 }
@@ -51,6 +56,8 @@ int main(int argc, char *argv[])
 void PortScan (int startPort, int endPort, char* target){
 	
 	 //Create a raw socket
+	 	fd_set fds;
+
     int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
     if(s < 0)
     {
@@ -151,9 +158,52 @@ void PortScan (int startPort, int endPort, char* target){
     int port;
     dest.sin_family = AF_INET;
     dest.sin_addr.s_addr = dest_ip.s_addr;
-    for(port = startPort ; port < endPort ; port++)
+    
+    	int pend_cnt = 0;
+
+    for(port = startPort ; port <=endPort ;)
     {
-        tcph->dest = htons ( port );
+		if (pend_cnt < 10 && port <=endPort){
+			 sendPackage(port, tcph, psh, dest, s, datagram, source_ip);
+			 port++;
+			 pend_cnt++;
+			 continue;
+		 }
+		
+        
+         struct sockaddr saddr;
+        int saddr_size, data_size;
+        saddr_size = sizeof saddr;
+
+     
+		unsigned char *buffer = (unsigned char *)malloc(65536); //Its Big
+		data_size = recvfrom(s , buffer , 65536 , 0 , &saddr , &saddr_size);
+		if(data_size > 0){
+			pend_cnt--;
+			process_packet(buffer , data_size);
+		}
+		/**
+		 * Needed to scan for more ports than 276
+		 */
+		FD_ZERO(&fds);
+		FD_SET(s, &fds);
+		 if (FD_ISSET(s, &fds))
+		{
+			data_size = recvfrom(s , buffer , 65536 , 0 , &saddr , &saddr_size);
+			if(data_size > 0){
+				process_packet(buffer , data_size);
+			}
+		}
+        
+        
+         
+	 }
+	
+}
+
+
+void sendPackage(int port,  struct tcphdr *tcph, struct pseudo_header psh,  struct sockaddr_in  dest, int s, char* datagram, char * source_ip){
+	  tcph->dest = htons ( port );
         tcph->check = 0; // if you set a checksum to zero, your kernel's IP stack should fill in the correct checksum during transmission
          
         psh.source_address = inet_addr( source_ip );
@@ -172,21 +222,8 @@ void PortScan (int startPort, int endPort, char* target){
             printf ("Error sending syn packet. Error number : %d . Error message : %s \n" , errno , strerror(errno));
             exit(0);
         }
-        
-        
-         struct sockaddr saddr;
-        int saddr_size, data_size;
-        saddr_size = sizeof saddr;
-
-     
-		unsigned char *buffer = (unsigned char *)malloc(65536); //Its Big
-        
-         data_size = recvfrom(s , buffer , 65536 , 0 , &saddr , &saddr_size);
-		 process_packet(buffer , data_size);
-	 }
+	}
 	
-}
-
  
 
 void process_packet(unsigned char* buffer, int size)
@@ -197,7 +234,7 @@ void process_packet(unsigned char* buffer, int size)
     unsigned short iphdrlen;
      
     if(iph->protocol == 6)
-    {
+    {	
         struct iphdr *iph = (struct iphdr *)buffer;
         iphdrlen = iph->ihl*4;
      
@@ -208,11 +245,13 @@ void process_packet(unsigned char* buffer, int size)
      
         memset(&dest, 0, sizeof(dest));
         dest.sin_addr.s_addr = iph->daddr;
+        
          
         if(tcph->syn == 1 && tcph->ack == 1 && source.sin_addr.s_addr == dest_ip.s_addr )
         {
             printf("Port %d open \n" , ntohs(tcph->source));
             fflush(stdout);
+            sleep(1);
         }
     }
 }
