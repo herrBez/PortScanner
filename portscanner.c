@@ -8,6 +8,7 @@
 
 //#include <arpa/inet.h>
 #include "portscanner.h"
+#include "raw_socket_scan.h"
 
 
 
@@ -23,6 +24,10 @@ void printHelp(char * program_name){
 	printf("\t -u \t specify a url to scan (Default localhost)\n");
 	printf("\t -v \t verbose output\n");
 	printf("\t -s \t perform a Syn scan\n");
+	printf("\t -n \t perform a NULL scan\n");
+	printf("\t -f \t perform a FIN scan\n");
+	printf("\t -x \t perform a XMAS scan\n");
+
 	printf("\nAuthors: Simon Targa, Mirko Bez\n");
 	exit(EXIT_SUCCESS);
 }
@@ -51,14 +56,16 @@ void parsePort(char * ports, portscanner * p){
 
 void getOptions(int argc, char * argv[], portscanner * p){
 	int opt;
-	while((opt = getopt(argc, argv, "phuvsi")) != -1) {
+	while((opt = getopt(argc, argv, "phuvsnfx")) != -1) {
 		switch(opt){
 			case 'p': parsePort(argv[optind], p); break;
 			case 'h': printHelp(argv[0]); break;
 			case 'u': free(p->host_name); p->host_name = strdup(argv[optind]); break;
 			case 'v': p->verbose = 1; break;
 			case 's': p->method = 1; break;
-			case 'i': p->method = 2; break;
+			case 'n': p->method = 2; break;
+			case 'f': p->method = 3; break;
+			case 'x' : p->method = 4; break;
 		}
 	}
 }
@@ -141,9 +148,39 @@ void TCPScan(portscanner * p){
 void SYNScan(portscanner * p){
 	printf("Scanning %s using SYN Scan\n", p->host_name);
 	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
+	PortScan(p->min_port, p->max_port, p->host_name, 0);
 	/* CREATING THE RAW SOCKET */
 	//int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
 }
+
+
+
+
+
+void NullScan(portscanner * p){
+	printf("Scanning %s using SYN Scan\n", p->host_name);
+	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
+	PortScan(p->min_port, p->max_port, p->host_name, 1);
+	/* CREATING THE RAW SOCKET */
+	//int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
+}
+
+void FinScan(portscanner * p){
+	printf("Scanning %s using SYN Scan\n", p->host_name);
+	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
+	PortScan(p->min_port, p->max_port, p->host_name, 2);
+	/* CREATING THE RAW SOCKET */
+	//int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
+}
+
+void XmasScan(portscanner * p){
+	printf("Scanning %s using SYN Scan\n", p->host_name);
+	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
+	PortScan(p->min_port, p->max_port, p->host_name, 3);
+	/* CREATING THE RAW SOCKET */
+	//int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
+}
+
 
 void IdleScan(portscanner * p){
 }
@@ -158,7 +195,9 @@ int main(int argc, char *argv[]) {
 	switch(p->method){
 		case 0: printf("I will perform a TCP scan\n"); TCPScan(p); break; 
 		case 1: printf("I will perform a SYN scan\n"); SYNScan(p); break;
-		case 2: printf("I will perform an Idle scan\n"); IdleScan(p); break;
+		case 2: printf("I will perform an NULL scan\n"); NullScan(p); break;
+		case 3: printf("I will perform an FIN scan\n"); FinScan(p); break;
+		case 4: printf("I will perform an XMAS scan\n"); XmasScan(p); break;
 		default: printf("Method not recognized. Goodbye."); return EXIT_FAILURE;
 	}
 	
