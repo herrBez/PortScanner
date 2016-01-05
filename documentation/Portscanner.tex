@@ -1,0 +1,65 @@
+\documentclass[a4paper]{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+	\hypersetup{colorlinks = true, pdfborderstyle = {/S/U/W 1}, linkcolor = black}
+\usepackage{tabularx}
+\usepackage{todonotes}
+\usepackage{listings}
+\lstset{ 
+	captionpos=b,
+	%basicstyle=\small\ttfamily,
+	tabsize=2,
+}
+\usepackage[backend=bibtex]{biblatex}
+\bibliography{Portscanner}
+
+	
+\begin{document}
+	\title{Portscanner} \author{Miro Bez \and  Simon Targa} \date{\today} \maketitle
+	\tableofcontents
+	\newpage
+
+	%			sich mit ...“
+	\section*{Introduction}
+	The aim of this project was to implement a portscanner. The scanner should be written in C and support various scan methods (e. g. TCP connect scan, TCP SYN scan \dots).
+	The final result is a program that tries to simulate the behaviour of nmap, which is one of the most used programs for port scanning. This document
+	describes how the program and the implemented scan methods work. The focus of the first section is on the TCP connect scan which is the most simple port scan technique. The second
+	section is about how the TCP SYN scan works and how it was implemented within the scope of this project. Chapter three describes the scan methods Xmas, TCP NULL and Fin scan and their
+	implementations. The fourth and final section is dedicated on how port scanning attempts can be detected and blocked by an IT administrator.
+	
+	
+	\section{TCP connect scan}
+	\subsection{Theory}
+	The TCP connect scan is probably the most easy method to scan for open ports. It simply takes advantage of the system call
+	\textit{connect} of the underlying operating system, to establish a connection with the target machine and port. Afterwards the
+	returned value of the system call is used to determaine if the port to check is either closed or open at the target machine~\cite{nmap2009}.\todo{Extended description with details. Add advantages and disadvantages (table?)} 
+	
+	
+	\subsection{Details of implementation}
+	In order to use the system call~\lstinline{connect} the implemenation uses C sockets of the type \lstinline|SOCK_STREAM|. 
+	\begin{lstlisting}[frame= single, language=C, caption=Code to create C socket of type \lstinline|SOCK_STREAM|]
+	int mysocket;
+	mysocket=socket(AF_INET, SOCK_STREAM, 0);
+	\end{lstlisting}
+	\todo{Continue to describe implementation}
+	
+	\section{TCP SYN scan}
+	\subsection{Theory}
+
+	
+	
+	\subsection{Details of implementation}
+
+	
+	\section{XMAS, TCP NULL and FIN scan}
+		\subsection{Theory}
+		
+		\subsection{Details of implementation}
+		
+	\section{Portscan Detectors}
+	
+	
+	
+	\newpage
+	\printbibliography
+\end{document}

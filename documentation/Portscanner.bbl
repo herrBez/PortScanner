@@ -1,0 +1,45 @@
+% $ biblatex auxiliary file $
+% $ biblatex version 2.3 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated as
+% required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+\entry{nmap2009}{book}{}
+  \name{author}{1}{}{%
+    {{}%
+     {Lyon}{L.}%
+     {Gordon~Fyodor}{G.~F.}%
+     {}{}%
+     {}{}}%
+  }
+  \list{publisher}{1}{%
+    {Nmap Project}%
+  }
+  \strng{namehash}{LGF1}
+  \strng{fullhash}{LGF1}
+  \field{sortinit}{L}
+  \field{isbn}{0979958717}
+  \field{title}{Nmap Network Scanning: The Official Nmap Project Guide to
+  Network Discovery and Security Scanning}
+  \verb{url}
+  \verb http://https://nmap.org/book/
+  \endverb
+  \field{year}{2009}
+\endentry
+
+\lossort
+\endlossort
+
+\endinput
