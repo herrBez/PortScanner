@@ -27,7 +27,6 @@ void printHelp(char * program_name){
 	printf("\t -n \t perform a NULL scan\n");
 	printf("\t -f \t perform a FIN scan\n");
 	printf("\t -x \t perform a XMAS scan\n");
-
 	printf("\nAuthors: Simon Targa, Mirko Bez\n");
 	exit(EXIT_SUCCESS);
 }
