@@ -165,14 +165,14 @@ void PortScan (int startPort, int endPort, char* target, int method){
 
     for(port = startPort ; port <=endPort ;)
     {
-		port++;
 		send_package(port, tcph, psh, dest, s, datagram, source_ip);
 		
 		int result = receive_packet(s, port, method);
 		while (result < 0){
 			result = receive_packet(s, port, method);
 
-		 } 
+		 }
+		 port++; 
 	 }
 	
 }
@@ -181,10 +181,9 @@ void PortScan (int startPort, int endPort, char* target, int method){
 void set_tcp_header(struct tcphdr *tcph , int fin, int syn, int rst, int psh, int ack, int urg){
 	int source_port = 43591;
 	tcph->source = htons ( source_port );
-    tcph->dest = htons (80);
     tcph->seq = htonl(1105024978);
     tcph->ack_seq = 0;
-    tcph->doff = sizeof(struct tcphdr) / 4;      //Size of tcp header
+    tcph->doff = sizeof(struct tcphdr) / 4;     
     tcph->fin=fin;
     tcph->syn=syn;
     tcph->rst=rst;
@@ -192,15 +191,12 @@ void set_tcp_header(struct tcphdr *tcph , int fin, int syn, int rst, int psh, in
     tcph->ack=ack;
     tcph->urg=urg;
     tcph->window = htons ( 14600 );  // maximum allowed window size
-    tcph->check = 0; //if you set a checksum to zero, your kernel's IP stack should fill in the correct checksum during transmission
     tcph->urg_ptr = 0;
 }
 
 
 void send_package(int port,  struct tcphdr *tcph, struct pseudo_header psh,  struct sockaddr_in  dest, int s, char* datagram, char * source_ip){
-	tcph->dest = htons ( port );
-	tcph->check = 0; // if you set a checksum to zero, your kernel's IP stack should fill in the correct checksum during transmission
-	 
+	tcph->dest = htons ( port );	 
 	psh.source_address = inet_addr( source_ip );
 	psh.dest_address = dest.sin_addr.s_addr;
 	psh.placeholder = 0;
@@ -214,7 +210,8 @@ void send_package(int port,  struct tcphdr *tcph, struct pseudo_header psh,  str
 	//Send the packet
 	if ( sendto (s, datagram , sizeof(struct iphdr) + sizeof(struct tcphdr) , 0 , (struct sockaddr *) &dest, sizeof (dest)) < 0)
 	{
-		printf ("Error sending syn packet. Error number : %d . Error message : %s \n" , errno , strerror(errno));
+		//printf ("Error sending syn packet. Error number : %d . Error message : %s \n" , errno , strerror(errno));
+		perror("Error sending packet: ");
 		exit(0);
 	}
 	}
@@ -230,7 +227,7 @@ void send_package(int port,  struct tcphdr *tcph, struct pseudo_header psh,  str
  */
 int receive_packet(int s, int port, int method)
 {
-		unsigned char *buffer = (unsigned char *)malloc(65536); //Its Big
+		unsigned char *buffer = (unsigned char *)malloc(65536); 
 		struct timeval tv;
 		fd_set fds;
 		struct sockaddr saddr;
