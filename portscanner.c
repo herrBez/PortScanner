@@ -158,7 +158,7 @@ void SYNScan(portscanner * p){
 
 
 void NullScan(portscanner * p){
-	printf("Scanning %s using SYN Scan\n", p->host_name);
+	printf("Scanning %s using NULL Scan\n", p->host_name);
 	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
 	PortScan(p->min_port, p->max_port, p->host_name, 1);
 	/* CREATING THE RAW SOCKET */
@@ -166,7 +166,7 @@ void NullScan(portscanner * p){
 }
 
 void FinScan(portscanner * p){
-	printf("Scanning %s using SYN Scan\n", p->host_name);
+	printf("Scanning %s using FIN Scan\n", p->host_name);
 	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
 	PortScan(p->min_port, p->max_port, p->host_name, 2);
 	/* CREATING THE RAW SOCKET */
@@ -174,7 +174,7 @@ void FinScan(portscanner * p){
 }
 
 void XmasScan(portscanner * p){
-	printf("Scanning %s using SYN Scan\n", p->host_name);
+	printf("Scanning %s using XMAS Scan\n", p->host_name);
 	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
 	PortScan(p->min_port, p->max_port, p->host_name, 3);
 	/* CREATING THE RAW SOCKET */
@@ -182,8 +182,7 @@ void XmasScan(portscanner * p){
 }
 
 
-void IdleScan(portscanner * p){
-}
+
 
 
 

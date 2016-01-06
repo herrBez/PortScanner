@@ -22,7 +22,7 @@
 	%			sich mit ...“
 	\section*{Introduction}
 	The aim of this project was to implement a port scanner. The scanner should be written in C and support various scan methods (e.g.\ TCP connect scan, TCP SYN scan \dots).
-	The final result is a program that tries to simulate the behaviour of nmap, which is one of the most used programs for port scanning. This document
+	The final result is a program that tries to simulate the behavior of nmap, which is one of the most used programs for port scanning. This document
 	describes how the program and the implemented scan methods work. The focus of the first section is on the TCP connect scan which is the most simple port scan technique. The second
 	section is about how the TCP SYN scan works and how it was implemented within the scope of this project. Chapter three describes the scan methods Xmas, TCP NULL and Fin scan and their
 	implementations. The fourth and final section is dedicated on how port scanning attempts can be detected and blocked by an IT administrator.
@@ -36,12 +36,33 @@
 	
 	
 	\subsection{Details of implementation}
-	In order to use the system call~\lstinline{connect} the implementation uses C sockets of the type \lstinline|SOCK_STREAM|. 
-	\begin{lstlisting}[frame= single, language=C, caption=Code to create C socket of type \lstinline|SOCK_STREAM|]
+	In order to use the system call~\lstinline{connect} the implementation uses C sockets of the type \lstinline|SOCK_STREAM|. This type
+	of socket allows us, to establish a tcp connection to the target machine.
+	\begin{lstlisting}[frame= single, language=C, caption=C code to create a tcp socket in C]
 	int mysocket;
 	mysocket=socket(AF_INET, SOCK_STREAM, 0);
 	\end{lstlisting}
-	\todo{Continue to describe implementation}
+	Additionally to the socket we also have to use a structure of the type \lstinline|sockaddr_in| to connect to the target machine and port.
+	The structure is needed to define the ip address of the target machine and the port to use for the connection. The listing shows the
+	code of how to assign the ip address and port to a structure of the type \lstinline|sockaddr_in|. 
+	\begin{lstlisting}[frame= single, language=C, caption= C code to use the structure \lstinline|sockaddr_in|]
+	struct sockaddr_in server;
+	struct hostent *hostname;
+	hostname = gethostbyname(p->host_name);
+	memcpy( (char *)&server.sin_addr, hostname->h_addr_list[0], hostname->h_length);
+	server.sin_family = AF_INET;
+	server.sin_port = htons(port);
+	\end{lstlisting}
+	The last step is to use the created socket and  \lstinline|sockaddr_in| structure to connect to the target machine and port. If the 
+	connection could be established we know that the port is open. To check if the connection attempt was successful, we only have to
+	check the return value of the connect() function. Upon successful completion, connect() shall return 0. The code to use the connect() function is shown in the listing.
+	\begin{lstlisting}[frame= single, language=C, caption= C code to use the connect() to check if port is open]
+	if(connect(mysocket, (struct sockaddr *)&server, sizeof(server))>=0){
+		printf("TCP - Port %d is open\n", i);
+		close(mysocket);
+		mysocket = socket(AF_INET, SOCK_STREAM, 0);
+	}
+	\end{lstlisting}
 	
 	\section{TCP SYN scan}
 	\subsection{Theory}
