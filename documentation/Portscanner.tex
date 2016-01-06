@@ -18,7 +18,7 @@
 	\title{Portscanner} \author{Mirko Bez \and  Simon Targa} \date{\today} \maketitle
 	\tableofcontents
 	\newpage
-
+	
 	%			sich mit ...“
 	\section*{Introduction}
 	The aim of this project was to implement a port scanner. The scanner should be written in C and support various scan methods (e.g.\ TCP connect scan, TCP SYN scan \dots).
@@ -66,11 +66,73 @@
 	
 	\section{TCP SYN scan}
 	\subsection{Theory}
-
+	
 	
 	
 	\subsection{Details of implementation}
-
+	In order to only send a syn request instead of open a full tcp connection (including handshake) the implementation uses raw sockets. Raw sockets allow to control
+	every section of the packets that will be sent. The function socket(), as shown in listing, can be used to create a raw socket that uses the tcp protocol.
+	\begin{lstlisting}[frame= single, language=C, caption= C code to use the connect() to check if port is open]
+		int mysocket;
+		mysocket=socket(AF_INET, SOCK_RAW,  IPPROTO_TCP);
+	\end{lstlisting}
+	Before we can send a syn request to the target machine, we have to build the packet to be sent. To send packets with a raw socket the function sendto() is used.
+	It's second parameter is a pointer to the message to be sent, which 
+	is the packet that we build. It consists of the tcp theader, the ip header and the data
+	to be sent. As we only want to send a syn request we don't care about the data, therefore it is empty. The C code of listing is used to initialize a pointer to the message
+	to be sent, with empty ip and tcp header.
+	\begin{lstlisting}[frame= single, language=C, caption= C code to use the connect() to check if port is open]
+	//Datagram to represent the packet
+	char datagram[4096];    
+	
+	//IP header
+	struct iphdr *iph = (struct iphdr *) datagram;
+	
+	//TCP header
+	struct tcphdr *tcph = (struct tcphdr *) (datagram + sizeof (struct ip));
+	\end{lstlisting}
+	Afterwards the ip header must be filled in. We don't need optional fields therefore the we use the minimal size possible size of the ip header which is 160 Bits (5*32 Bits). We use the ip version 4, which is still the most widely used ip version. The length of our packet
+	is the sum of the length of the ip header and the length of the tcp header. For the time to live we choose 64, which should be big enough
+	fur our purpose. As transfer protocol we set the tcp protocol. The source address of the ip header is set to the ip address of the scanning system and the destination address is set to the address of the target system to scan. To have a complete ip header we also
+	have to calculate its check sum.
+	\begin{lstlisting}[frame= single, language=C, caption= C code to fill in ip header]
+	//Fill in the IP Header
+	iph->ihl = 5;
+	iph->version = 4;
+	iph->tos = 0;
+	iph->tot_len = sizeof (struct ip) + sizeof (struct tcphdr);
+	iph->id = htons (54321); //Id of this packet
+	iph->frag_off = htons(16384);
+	iph->ttl = 64;
+	iph->protocol = IPPROTO_TCP;
+	iph->saddr = inet_addr ( source_ip );   
+	iph->daddr = dest_ip.s_addr;
+	iph->check = csum(datagram, iph->tot_len>>1);
+	\end{lstlisting}
+	Before the packet can be sent, we also need to fill in the tcp header. In order to send a syn request we only set the syn flag to true and all the other flags to false.
+	\begin{lstlisting}[frame= single, language=C, caption= C code to set flags in tcp header]
+	tcph->fin=0;
+	tcph->syn=1;
+	tcph->rst=0;
+	tcph->psh=0;
+	tcph->ack=0;
+	tcph->urg=0;
+	\end{lstlisting}
+	The last step before we can send the packet is to set the destination port (the port to scan)  in the tcp header and calculate its check sum.
+	\begin{lstlisting}[frame= single, language=C, caption= C code to set port and calculate checksum in tcp header]
+	tcph->dest = htons ( port );
+	tcph->check = csum(&psh, sizeof(struct pseudo_header))
+	\end{lstlisting}
+	To function sendto() is used to send the created packet to the target machine and port. If the sending fails the program terminates with
+	an error, because then we cannot scan for open ports.
+	\begin{lstlisting}[frame= single, language=C, caption= C code to set port and calculate checksum in tcp header]
+	//Send the packet
+	if(sendto(s, datagram, packetsize, 0 , &dest, destsize)< 0)
+	{
+  perror("Error sending packet: ");
+	exit(0);
+	}
+	\end{lstlisting}
 	
 	\section{XMAS, TCP NULL and FIN scan}
 		\subsection{Theory}
