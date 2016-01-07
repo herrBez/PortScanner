@@ -133,11 +133,36 @@
 	exit(0);
 	}
 	\end{lstlisting}
-	
+	To complete the syn port scan, we also have to receive the answer to our sent packet. To receive packets with from a raw socket the function recvfrom() is used. The function call blocks, until it
+	receives a packet from the given socket. Therefore we used the function select, to add an timer to the receiving socket. As you can see in the code of the following listing, we add an timer of 1 sec
+	to the receiving socket and only use the recvfrom() function if the socket contains a packet. If we cannot receive an answer then we simply scan the next port in our implementation.
+	\begin{lstlisting}[frame= single, language=C, caption= C code to receive the packet]
+ FD_ZERO(&fds);
+ FD_SET(s, &fds);
+ tv.tv_sec = 1;
+ tv.tv_usec = 0;
+ select(s+ 1, &fds, NULL, NULL, &tv);		
+ if (FD_ISSET(s, &fds))
+ {
+ data_size = recvfrom(s, buffer, 65536, 0, &saddr, &saddr_size);
+	................................
+ }else{
+  return 0;
+ }
+	\end{lstlisting}
+	Because it could be the case that we receive packets from other requests, we first have to check, if the received packet
+	is an answer to our request. To do so we use the IF-Statement of the Listing~\ref{lst:ifpacket}. It checks if the source port of the received packet equals the destination port of our sent packet and
+	if the source ip equals to the destination ip to which we sent the packet.
+	\begin{lstlisting}[frame= single, language=C, caption= IF statement to check origin of packet, label=lst:ifpacket]
+	if(source.sin_addr.s_addr == dest_ip.s_addr &&
+	port == ntohs(tcph->source))
+	\end{lstlisting}
 	\section{XMAS, TCP NULL and FIN scan}
 		\subsection{Theory}
 		
 		\subsection{Details of implementation}
+		The implementation of the XMAS, TCP NULL and FIN scan is quiet similar to the implementation of the syn scanner. In fact these four scan methods have very much in common.
+		They all need a raw socket to work. They only difference is in the way the tcp header flags are set and the way the scanner has to interpret the received packet.  
 		
 	\section{Port Scan Detectors}
 	
