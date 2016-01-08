@@ -26,9 +26,32 @@ node_t * head;
 static int count = 1;  
 /* If is set to 1 the scanned tcp ports (and the number of times) are also saved! */                
 static int _get_all_info = 1;
-
+/* struct used in order to capture the packets using the library pcap */
 pcap_t * handle;	
+/* contains the fixed time interval 300 ms */
+struct timespec _my_time; 
+/* say to a thred to stop */
+bool break_thread = false;
 
+
+
+
+
+/**
+ * Function called when a Ctrl-C is received:
+ * It breaks the pcap_loop
+ */
+void intHandler(int d){
+	printf("\n\n\n\n");
+	printf("**************************************\n");
+	printf("* Ctrl-C caught. Breaking the loop...*\n");
+	printf("**************************************\n");
+	pcap_breakloop(handle);
+	break_thread = true;
+}
+
+
+struct sigaction main_thread_sigaction;
 
 
 
@@ -75,18 +98,23 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 	
 	
 	node_t * actual_node;
-	
+	bool notcontained = false;
 	if(head == NULL){
 		printf("Adding the first element %s \n", actual_adress);
 		head = newNode(actual_adress);
 	}
 	else if(!contains(head, actual_adress)){
 		push(head, actual_adress);
+		/* start a pthread */
+		notcontained = true;
+		
+		
 	}	
 	
 	actual_node = contains_node(head, actual_adress);
-	//printf("ACTUAL NODE:"); printNode(actual_node);
-
+	if(notcontained){
+		pthread_create(&actual_node->my_thread, NULL, thread_function, actual_node);
+	}
 	/* print source and destination IP addresses */
 	printf("       From: %s\n", actual_adress);
 	printf("         To: %s\n", inet_ntoa(ip->ip_dst));
@@ -144,7 +172,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 		} else {
 			my_port * actual_port = contains_my_port(actual_node->port_list, dst_port);
 			if(actual_port == NULL){
-				push_my_port(actual_node->port_list, dst_port);
+				push_my_port(actual_node->port_list, dst_port);	
 			} else {
 				actual_port->times++;
 			}
@@ -158,12 +186,18 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 		fprintf(stderr, "ERROR PORT NEGATIVE\n");
 	else if(dst_port > 65536)
 		fprintf(stderr, "ERROR PORT TOO BIG\n");
-	else if(dst_port == 11 || dst_port == 12 || dst_port == 13 || dst_port == 2000)
-		actual_node->score += 10;
-	else if(dst_port < 1024)
-		actual_node->score += 3;
-	else if(dst_port >= 1024)
-		actual_node->score += 1;
+	else if(dst_port == 11 || dst_port == 12 || dst_port == 13 || dst_port == 2000){
+		actual_node->actual_score += 10;
+		actual_node->total_score += 10;
+	}
+	else if(dst_port < 1024){
+		actual_node->actual_score += 3;
+		actual_node->total_score += 3;
+	}
+	else if(dst_port >= 1024){
+		actual_node->actual_score += 1;
+		actual_node->total_score += 1;
+	}
 	
 	/* IF PAYLOAD MATTERS -> PLEASE UNCOMMENT THE FOLLOWING LINES!
 	int size_payload;
@@ -183,48 +217,22 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
 return;
 }
-struct timespec _my_time; 
 
-bool break_thread = false;
-
-/**
- * Function called when a Ctrl-C is received:
- * It breaks the pcap_loop
- */
-void intHandler(int d){
-	printf("\n\n\n\n");
-	printf("**************************************\n");
-	printf("* Ctrl-C caught. Breaking the loop...*\n");
-	printf("**************************************\n");
-	pcap_breakloop(handle);
-	break_thread = true;
+time_t my_now(){
+	time_t rawtime;
+	time ( &rawtime );
+	return rawtime;
 }
 
-/** Function that control the score of all the nodes and set the score again to 0 */
-void controlScore(){
-	node_t * current = head;
-	while(current != NULL){
-		if(current->score >= PORT_SCAN_SCORE){
-			printf("*** SCAN FROM %s dectected ***\n", current->ip_src);
-		}
-		current->score = 0;
-		current = current->next;
-	}
+void now(){
+	time_t rawtime;
+	struct tm * timeinfo;
+
+	time ( &rawtime );
+	timeinfo = localtime ( &rawtime );
+	printf ( "Current local time and date: %s", asctime (timeinfo) );
 }
 
-
-
-void * thread_function(void * threadid){
-	printf("Hallo1 %ld\n", _my_time.tv_nsec);
-	while(!break_thread){
-		if(nanosleep(&_my_time, NULL) != 0){
-			perror("Nanosleep():");
-			break;
-		}
-		controlScore();
-	}
-	pthread_exit(NULL);
-}
 
 /* https://www.sophos.com/en-us/support/knowledgebase/115153.aspx */
 /**
@@ -234,9 +242,10 @@ void * thread_function(void * threadid){
  * -m maximum number of packets standard: infinity
  */
 int main(int argc, char * argv[]){
+	
 	_my_time.tv_sec = 0;
 	_my_time.tv_nsec = 300000000; //300ms
-	pthread_t _thread_time;
+	
 	/* Variable declaration */
 	char *dev = NULL;								/* capture device name */
 	char errbuf[PCAP_ERRBUF_SIZE];					/* error buffer */
@@ -271,10 +280,10 @@ int main(int argc, char * argv[]){
 
 	/* print capture info */
 	printf("Device: %s\n", dev);
-	printf("Number of packets");
+	printf("Number of packets ");
 
 	if(num_packets == -1)
-		printf("Infinity: i.e. until Ctrl-C occurs\n");
+		printf("infinity: i.e. until Ctrl-C occurs\n");
 	else 
 		printf("%d\n", num_packets);
 	printf("Filter expression: %s\n", filter_exp);
@@ -307,27 +316,57 @@ int main(int argc, char * argv[]){
 	}
 	
 	/* Installing a signal handler for ctrl-c that breaks the pcap_loop function*/
-	signal(SIGINT, intHandler);
+	main_thread_sigaction.sa_handler = intHandler;
+    sigemptyset(&main_thread_sigaction.sa_mask);
+    main_thread_sigaction.sa_flags = 0; 
+    
+   
+
+	if(sigaction(SIGINT, &main_thread_sigaction, NULL) == -1){
+		perror("Sigaction()");
+	}
+	
 	
 	/* Initializing the list of hosts that are trying to scan the target given in the rule (filter_exp) */
 	head = NULL;
 	
-	int rc = pthread_create(&_thread_time, NULL, &thread_function, NULL);
-    if (!rc){
-
+	
+	printf("Begin scanning at: ");
+	now();
+	time_t begTime = my_now();
     
-		/* now we can set our callback function */
-		pcap_loop(handle, num_packets, got_packet, NULL);
-		break_thread = true;
-		print_list(head);
-	} else {
-		printf("Error: cannot start create");
+	/* now we can set our callback function */
+	pcap_loop(handle, num_packets, got_packet, NULL);
+	break_thread = true;
+	/* WAITING ALL THE THREADS TO FINISH */
+	node_t * current = head;
+	printf("WAITING\n");
+	while(current != NULL){
+		printNode(current);
+		if(pthread_join(current->my_thread, NULL) != 0)
+			perror("PTHREAD_JOIN():");
+		else {
+			printf("JOINED WITH SUCCESS\n");
+		}
+		current = current->next;
 	}
+	
+	printf("End Scanning at: \n");
+	now();
+	time_t endTime = my_now();
+	now();
+	
+	printf("*** TOTAL TIME %f seconds***\n", difftime(endTime, begTime));
+	
+	
+	print_list(head);
+	
 	/* cleanup */
 	free_list(head);
 	pcap_freecode(&fp);
 	pcap_close(handle);
 	
 	printf("\nCapture complete.\n");
+	pthread_exit(NULL);
 	return EXIT_SUCCESS;
 }

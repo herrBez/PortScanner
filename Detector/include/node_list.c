@@ -3,7 +3,7 @@
 
 void printNode(node_t * n){
 	int i = 0;
-	printf("[Score = %d][SRC IP = %s][TCP=%d]", n->score, n->ip_src,n->tcp);
+	printf("[Score = %d][SRC IP = %s][TCP=%d]", n->total_score, n->ip_src,n->tcp);
 	printf("[UDP=%d][ICMP=%d][IP=%d][UK=%d]", n->udp, n->icmp, n->ip, n->unknown);
 	printf("TCP PORTS{");
 	print_list_my_port(n->port_list);
@@ -36,7 +36,8 @@ node_t * newNode(char * actual_adress){
 	node_t * n = malloc(sizeof(node_t));
 	n->ip_src = malloc(sizeof(char) * (strlen(actual_adress) + 1));
 	strcpy(n->ip_src, actual_adress);
-	n->score = 0;
+	n->total_score = 0;
+	n->actual_score = 0;
 	n->tcp = 0;
 	n->port_list = NULL;
 	n->udp = 0;

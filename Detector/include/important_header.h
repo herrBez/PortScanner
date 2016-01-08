@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -23,7 +24,7 @@
 
 #include "./port_list.h"
 #include "./node_list.h"
-
+#include "./thread_file.h"
 //Used in order to capture ctrl-c
 #include <signal.h>
 //Used to create a thread
@@ -90,5 +91,7 @@ struct sniff_tcp {
         u_short th_sum;                 /* checksum */
         u_short th_urp;                 /* urgent pointer */
 };
+
+
 
 #endif

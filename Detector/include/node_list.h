@@ -5,23 +5,24 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <pthread.h>
 #include "port_list.h"
 #define PORT_SCAN_SCORE 21
 
 
 typedef struct node {
-  int score;
-  char * ip_src;
-  unsigned int tcp;
-  my_port * port_list;
- 
-  
-  int port_index;
-  unsigned int udp;
-  unsigned int icmp;
-  unsigned int unknown;
-  unsigned int ip;
-  struct node *next;
+	unsigned int actual_score;
+	unsigned int total_score;
+	char * ip_src;
+	unsigned int tcp;
+	my_port * port_list;
+	int port_index;
+	unsigned int udp;
+	unsigned int icmp;
+	unsigned int unknown;
+	unsigned int ip;
+	pthread_t my_thread;
+	struct node *next;
 }node_t;
 
 node_t * newNode(char * actual_adress);
