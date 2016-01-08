@@ -21,7 +21,8 @@ typedef struct node {
 	unsigned int icmp;
 	unsigned int unknown;
 	unsigned int ip;
-	pthread_t my_thread;
+	unsigned int scan_detected;
+	pthread_t thread;
 	struct node *next;
 }node_t;
 
@@ -42,7 +43,10 @@ node_t * contains_node(node_t * head, char * ip_src);
  */
 bool contains(node_t * head, char * ip_src);
 /* Add a new element at the end of the linked list */
-void push(node_t * head, char * ip_src);
+void push(node_t ** head, char * ip_src);
+/* free list */
+void free_list(node_t * head);
 
+bool _equals(node_t n1, node_t n2); 
 
 #endif

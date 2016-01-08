@@ -16,7 +16,7 @@ typedef struct _my_port{
 /* return a new my port element */
 my_port * new_my_port(int dst_port);
 /* add a new element at the end of the list */
-void push_my_port(my_port * head, int port);
+void push_my_port(my_port ** head, int port);
 /* 
  * check if a dst_port is already contained in the list: returns the element 
  * if it's contained otherwise null 
