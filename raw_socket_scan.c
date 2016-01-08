@@ -262,7 +262,6 @@ int receive_packet(int s, int port, int method)
 				memset(&dest, 0, sizeof(dest));
 				dest.sin_addr.s_addr = iph->daddr;
 				
-				
 				//check if received packet is answer to the sent packet
 				if(source.sin_addr.s_addr == dest_ip.s_addr && port == ntohs(tcph->source))
 				{
