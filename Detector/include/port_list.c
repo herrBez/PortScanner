@@ -1,3 +1,4 @@
+/* implementation of port_list.h */
 #include "port_list.h"
 
 
@@ -7,11 +8,17 @@ my_port * new_my_port(int dst_port){
 	mp->port = dst_port;
 	mp->times = 1;
 	mp->next = NULL;
+	return mp;
 }
 
 /* add a new element at the end of the list */
-void push_my_port(my_port * head, int dst_port){
-	my_port * current = head;
+void push_my_port(my_port ** head, int dst_port){
+	my_port * current = *head;
+	if(current == NULL) {
+		current = new_my_port(dst_port);
+		return;
+	}
+	
     while (current->next != NULL) {
         current = current->next;
     }
@@ -48,12 +55,12 @@ void print_my_port(my_port * mp){
 }
 /* Print a list of my port element */
 void print_list_my_port(my_port * head){
+	my_port * current = head;
 	if(head == NULL){
 		printf("<The List is empty>");
 		return;
 	}
-	int i = 1;
-    my_port * current = head;
+   
 
     while (current != NULL) {
 		print_my_port(current);
@@ -63,8 +70,8 @@ void print_list_my_port(my_port * head){
 /* Frees a list of my port elements */
 void free_list_my_port(my_port * head){
 	my_port * curr;
-	while ((curr = head) != NULL) { // set curr to head, stop if list empty.
-		head = head->next;          // advance head to next element.
-		free (curr);                // delete saved pointer.
+	while ((curr = head) != NULL) { /* set curr to head, stop if list empty. */
+		head = head->next;          /* advance head to next element. */
+		free (curr);                /* delete saved pointer.*/
 	}
 }

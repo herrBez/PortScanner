@@ -1,23 +1,41 @@
 #ifndef __MY_IMPORTANT_HEADER__
 #define __MY_IMPORTANT_HEADER__
+/**********************************************************
+ * 
+ * This file contains all includes and is 
+ * the copy of the first part of the program:
+ * http://www.tcpdump.org/pcap.html
+ * 
+ * My Addition:
+ * 1) signal header in order to catch and process a sigint signal
+ * 2) pthread header
+ * 3) time header
+ * 4) My Local header
+ * 
+ **********************************************************/
 #include <pcap.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
+#include <unistd.h> /* In order to get "getopt()" */
 
 #include "./port_list.h"
 #include "./node_list.h"
-
-//Used in order to capture ctrl-c
+#include "./thread_file.h"
+/* Used in order to capture ctrl-c */
 #include <signal.h>
+/* Used to create a thread */
+#include <pthread.h>
+#include <time.h>
 
+#include "./_my_time.h"
 /* default snap length (maximum bytes per packet to capture) */
 #define SNAP_LEN 1518
 
@@ -79,5 +97,7 @@ struct sniff_tcp {
         u_short th_sum;                 /* checksum */
         u_short th_urp;                 /* urgent pointer */
 };
+
+
 
 #endif

@@ -18,18 +18,84 @@
 
 #include "./include/important_header.h"
 
-static int counter = 0;
 
 /* Head of the linked list containing the information about the ip-adresses who potentially are trying to port scan us */				
 node_t * head;	
 /* packet counter */						
 static int count = 1;  
 /* If is set to 1 the scanned tcp ports (and the number of times) are also saved! */                
-static int _get_all_info = 1;
-
+static bool _get_all_info = false;
+/* struct used in order to capture the packets using the library pcap */
 pcap_t * handle;	
+/* contains the fixed time interval 300 ms */
+struct timespec _my_time; 
+/* say to a thred to stop */
+bool break_thread = false;
 
 
+
+
+void printHelp(char * program_name){
+	printf("=========================================\n");
+	printf("=== Portscanner Detector help message ===\n");
+	printf("=========================================\n");
+	printf("Usage: %s [options]\n", program_name);
+	printf("Options:\n\n");
+	printf("\t -h \t print this help and exit\n");
+	printf("\t -s \t save all the tcp ports requested from the potential attackers\n");
+	printf("\t -d \t specify a device to use (e.g. wlan0, eth0) you can get those devices using the command ifconfig\n");
+	printf("\t -v \t verbose output\n");
+	printf("\t -i \t destination ip adress\n");
+	printf("\t -m \t maximum number of catchable packets after which the program ends\n");
+	printf("\nAuthors: Simon Targa, Mirko Bez\n");
+	exit(EXIT_SUCCESS);
+}
+
+
+void getOptions(int argc, char * argv[], char ** dev, int * num_packets, char ** dst_ip, bool * verbose){
+	int opt;
+	while((opt = getopt(argc, argv, "hsdimv")) != -1) {
+		switch(opt){
+			case 'h': printHelp(argv[0]); break;
+			case 's': _get_all_info = true; break; /* Stays for save */
+			case 'd': 
+				if(optind == argc){
+					printf("Option 'd' needs a value!!\n");
+					exit(0);
+				}
+				*dev = strdup(argv[optind]); break; /* stays for device */
+			case 'm': *num_packets = (int) strtol(argv[optind], NULL, 0); break;
+			case 'i': 
+				if(optind == argc){
+					printf("Option 'd' needs a value!!\n");
+					exit(0);
+				}
+				*dst_ip = strdup(argv[optind]); printf("DST IP %s\n", *dst_ip);  exit(0); break;
+			case 'v': 
+				*verbose = true; break;
+		}
+	}
+}
+
+
+
+
+
+/**
+ * Function called when a Ctrl-C is received:
+ * It breaks the pcap_loop
+ */
+void my_sigint_handler(int d){
+	printf("\n\n\n\n");
+	printf("**************************************\n");
+	printf("* Ctrl-C caught. Breaking the loop...*\n");
+	printf("**************************************\n");
+	pcap_breakloop(handle);
+	break_thread = true;
+}
+
+
+struct sigaction main_thread_sigaction;
 
 
 /*
@@ -37,19 +103,21 @@ pcap_t * handle;
  */
 void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
 	/* declare pointers to packet headers */
-	const struct sniff_ethernet *ethernet;  /* The ethernet header [1] */
+	
 	const struct sniff_ip *ip;              /* The IP header */
 	const struct sniff_tcp *tcp;            /* The TCP header */
-	const char *payload;                    /* Packet payload */
 	
 	/* Variables */
+	char * tmp, * actual_adress;
+	node_t * actual_node;
+	
 	int size_ip;
 	int size_tcp;
-	
+	int dst_port;
+	int size_payload;
 	printf("\nPacket number %d:\n", count++);
 	
-	/* define ethernet header */
-	ethernet = (struct sniff_ethernet*)(packet);
+	
 	
 	/* define/compute ip header offset */
 	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
@@ -69,24 +137,35 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
      * 
      *  ==> IT IS NECESSARY TO COPY THE VALUE
 	 */ 
-	char * tmp = inet_ntoa(ip->ip_src);
-	char * actual_adress = malloc((strlen(tmp)+1) * sizeof(char));
+	tmp = inet_ntoa(ip->ip_src);
+	actual_adress = malloc((strlen(tmp)+1) * sizeof(char));
 	strcpy(actual_adress, tmp);
 	
 	
-	node_t * actual_node;
 	
-	if(head == NULL){
-		printf("Adding the first element %s \n", actual_adress);
-		head = newNode(actual_adress);
-	}
-	else if(!contains(head, actual_adress)){
-		push(head, actual_adress);
-	}	
+	bool contained = true;
 	
 	actual_node = contains_node(head, actual_adress);
-	//printf("ACTUAL NODE:"); printNode(actual_node);
-
+	
+	if(actual_node == NULL){
+		push(&head, actual_adress);
+		/* start a pthread */
+		contained = false;
+		actual_node = contains_node(head, actual_adress);
+	}
+	
+	
+	
+	
+	
+	
+	
+	if(!contained){
+		if(pthread_create(&actual_node->thread, NULL, thread_function, actual_node) != 0){
+			perror("Pthread_create()");
+			my_sigint_handler(SIGINT);
+		}
+	}
 	/* print source and destination IP addresses */
 	printf("       From: %s\n", actual_adress);
 	printf("         To: %s\n", inet_ntoa(ip->ip_dst));
@@ -98,7 +177,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
 			actual_node->tcp++;
-			
 			printf("   Protocol: TCP\n");
 			break;
 		case IPPROTO_UDP:
@@ -130,7 +208,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 		printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
 		return;
 	}
-	int dst_port = ntohs(tcp->th_dport);
+	dst_port = ntohs(tcp->th_dport);
 	
 	printf("   Src port: %d\n", ntohs(tcp->th_sport));
 	printf("   Dst port: %d\n", dst_port);
@@ -144,7 +222,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 		} else {
 			my_port * actual_port = contains_my_port(actual_node->port_list, dst_port);
 			if(actual_port == NULL){
-				push_my_port(actual_node->port_list, dst_port);
+				push_my_port(&actual_node->port_list, dst_port);	
 			} else {
 				actual_port->times++;
 			}
@@ -158,69 +236,91 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 		fprintf(stderr, "ERROR PORT NEGATIVE\n");
 	else if(dst_port > 65536)
 		fprintf(stderr, "ERROR PORT TOO BIG\n");
-	else if(dst_port == 11 || dst_port == 12 || dst_port == 13 || dst_port == 2000)
-		actual_node->score += 10;
-	else if(dst_port < 1024)
-		actual_node->score += 3;
-	else if(dst_port >= 1024)
-		actual_node->score += 1;
+	else if(dst_port == 11 || dst_port == 12 || dst_port == 13 || dst_port == 2000){
+		actual_node->actual_score += 10;
+		actual_node->total_score += 10;
+	}
+	else if(dst_port < 1024){
+		actual_node->actual_score += 3;
+		actual_node->total_score += 3;
+	}
+	else if(dst_port >= 1024){
+		actual_node->actual_score += 1;
+		actual_node->total_score += 1;
+	}
 	
-	/* IF PAYLOAD MATTERS -> PLEASE UNCOMMENT THE FOLLOWING LINES!
-	int size_payload;
+	
+	/* IF THE CONTENT OF PAYLOAD MATTERS -> PLEASE UNCOMMENT THE FOLLOWING LINES! */
+	/*const char *payload;                   
+	//const struct sniff_ethernet *ethernet;  // The ethernet header [1] 
+	// define ethernet header 
+	//ethernet = (struct sniff_ethernet*)(packet);
+	//int size_payload;
 	//define/compute tcp payload (segment) offset 
-	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
+	//payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);*/
 	
-	// compute tcp payload (segment) size 
+	/* compute tcp payload (segment) size */
 	size_payload = ntohs(ip->ip_len) - (size_ip + size_tcp);
-	
-	
-	 // Print payload data; it might be binary, so don't just
-	 // treat it as a string.
-	 
-	//printf("   Payload (%d bytes):\n", size_payload);
-
-	*/
-
-return;
+	printf("   Payload (%d bytes):\n", size_payload);
+	return;
 }
 
-/**
- * Function called when a Ctrl-C is received:
- * It breaks the pcap_loop
- */
-void intHandler(int d){
-	printf("\n\n\n\n");
-	printf("**************************************\n");
-	printf("* Ctrl-C caught. Breaking the loop...*\n");
-	printf("**************************************\n");
-	pcap_breakloop(handle);
-}
 
+void printInfo(char * dev, int num_packets, char * filter_exp){
+	printf("   ****************************\n");
+	printf("   *** A PORT SCAN DETECTOR ***\n");
+	printf("   ****************************\n");
+
+	printf("*****************************************************\n");
+	/* print capture info */
+	printf("Device: %s\n", dev);
+	printf("Number of packets ");
+
+	if(num_packets == -1)
+		printf("infinity: i.e. until Ctrl-C occurs\n");
+	else 
+		printf("%d\n", num_packets);
+	printf("Filter expression: %s\n", filter_exp);
+
+	printf("*****************************************************\n\n\n");
+}
 
 
 /* https://www.sophos.com/en-us/support/knowledgebase/115153.aspx */
+/**
+ * argv[0] program name
+ * -i define own ip not optional
+ * -d define own device (wlan0, eth0 and so on) optional
+ * -m maximum number of packets standard: infinity
+ */
 int main(int argc, char * argv[]){
-
+	
+	_my_time.tv_sec = 0;
+	_my_time.tv_nsec = 300000000; /* Default 300ms */
+	
 	/* Variable declaration */
-	char *dev = NULL;								/* capture device name */
+	char * dev = NULL;										/* capture device name */
 	char errbuf[PCAP_ERRBUF_SIZE];					/* error buffer */
 	char filter_exp[] = "dst host 192.168.1.3"; 	/* filter expression */
 	struct bpf_program fp;							/* compiled filter program (expression) */
 	bpf_u_int32 mask;								/* subnet mask */
 	bpf_u_int32 net;								/* ip */
 	int num_packets = -1;							/* number of packets to capture */
-
-
-	/* check for capture device name on command-line */
-	if (argc == 2) {
-		dev = argv[1];
-	}
-	else {
+	
+	char * dst_ip;
+	
+	bool verbose = false; 
+	getOptions(argc, argv, &dev, &num_packets, &dst_ip, &verbose);
+	/* Not given as parameter */
+	if(dev == NULL) {
+		dev = calloc(64, sizeof(char));
+	
+		errbuf[0] = '\0';
+	
 		/* find a capture device if not specified on command-line */
-		dev = pcap_lookupdev(errbuf);
-		if (dev == NULL) {
-			fprintf(stderr, "Couldn't find default device: %s\n",
-			    errbuf);
+		strcpy(dev, pcap_lookupdev(errbuf));
+		if (strlen(errbuf) > 0) {
+			fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -232,11 +332,8 @@ int main(int argc, char * argv[]){
 		net = 0;
 		mask = 0;
 	}
-
-	/* print capture info */
-	printf("Device: %s\n", dev);
-	printf("Number of packets: %d\n", num_packets);
-	printf("Filter expression: %s\n", filter_exp);
+	
+	printInfo(dev, num_packets, filter_exp);
 
 	/* open capture device */
 	handle = pcap_open_live(dev, SNAP_LEN, NON_PROMISCUOUS, 1000, errbuf);
@@ -266,20 +363,52 @@ int main(int argc, char * argv[]){
 	}
 	
 	/* Installing a signal handler for ctrl-c that breaks the pcap_loop function*/
-	signal(SIGINT, intHandler);
+	main_thread_sigaction.sa_handler = my_sigint_handler;
+    sigemptyset(&main_thread_sigaction.sa_mask);
+    main_thread_sigaction.sa_flags = 0; 
+    
+   
+
+	if(sigaction(SIGINT, &main_thread_sigaction, NULL) == -1){
+		perror("Sigaction()");
+	}
+	
 	
 	/* Initializing the list of hosts that are trying to scan the target given in the rule (filter_exp) */
 	head = NULL;
 	
+	
+	printf("Begin scanning at: ");
+	print_now();
+	time_t begTime = my_now();
+    
 	/* now we can set our callback function */
 	pcap_loop(handle, num_packets, got_packet, NULL);
+	break_thread = true;
+	/* WAITING ALL THE THREADS TO FINISH */
+	node_t * current = head;
+	printf("WAITING\n");
+	void * end;
+	
+	while(current != NULL){
+		pthread_join(current->thread, &end);
+		current = current->next;
+	}
+	
+	printf("End Scanning at: \n");
+	time_t endTime = my_now();
+	print_now();
+	
+	printf("*** TOTAL TIME ELAPSED %.02f seconds***\n", difftime(endTime, begTime));
+	
+	
 	print_list(head);
 	
 	/* cleanup */
 	free_list(head);
 	pcap_freecode(&fp);
 	pcap_close(handle);
-
+	free(dev);
 	printf("\nCapture complete.\n");
 	return EXIT_SUCCESS;
 }

@@ -57,9 +57,19 @@ void getOptions(int argc, char * argv[], portscanner * p){
 	int opt;
 	while((opt = getopt(argc, argv, "phuvsnfx")) != -1) {
 		switch(opt){
-			case 'p': parsePort(argv[optind], p); break;
+			case 'p': 
+				if(argc == optind){
+					fprintf("The option 'p' needs a portrange!! Exiting..\n");
+					exit(0);
+				}
+				parsePort(argv[optind], p); break;
 			case 'h': printHelp(argv[0]); break;
-			case 'u': free(p->host_name); p->host_name = strdup(argv[optind]); break;
+			case 'u': 
+				if(argc == optind){
+					fprintf("The option 'u' needs an url!! Exiting..\n");
+					exit(0);
+				}
+				free(p->host_name); p->host_name = strdup(argv[optind]); break;
 			case 'v': p->verbose = 1; break;
 			case 's': p->method = 1; break;
 			case 'n': p->method = 2; break;

@@ -5,23 +5,25 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <pthread.h>
 #include "port_list.h"
 #define PORT_SCAN_SCORE 21
 
 
 typedef struct node {
-  int score;
-  char * ip_src;
-  unsigned int tcp;
-  my_port * port_list;
- 
-  
-  int port_index;
-  unsigned int udp;
-  unsigned int icmp;
-  unsigned int unknown;
-  unsigned int ip;
-  struct node *next;
+	unsigned int actual_score;
+	unsigned int total_score;
+	char * ip_src;
+	unsigned int tcp;
+	my_port * port_list;
+	int port_index;
+	unsigned int udp;
+	unsigned int icmp;
+	unsigned int unknown;
+	unsigned int ip;
+	unsigned int scan_detected;
+	pthread_t thread;
+	struct node *next;
 }node_t;
 
 node_t * newNode(char * actual_adress);
@@ -41,7 +43,10 @@ node_t * contains_node(node_t * head, char * ip_src);
  */
 bool contains(node_t * head, char * ip_src);
 /* Add a new element at the end of the linked list */
-void push(node_t * head, char * ip_src);
+void push(node_t ** head, char * ip_src);
+/* free list */
+void free_list(node_t * head);
 
+bool _equals(node_t n1, node_t n2); 
 
 #endif
