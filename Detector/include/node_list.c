@@ -1,3 +1,4 @@
+/* implementation of node_list.h */
 #include "node_list.h"
 
 void printNode(node_t * n){
@@ -26,9 +27,6 @@ void print_list(node_t * head){
 		printf("***********************************************************************\n\n");
 		printf("#%d. ", i++);
 		printNode(current);
-		if(current->score > PORT_SCAN_SCORE){
-			printf("***Port Scan from this ip (%s) detected***\n", current->ip_src);
-		}
 		printf("\n************************************************************************\n\n");
         current = current->next;
     }

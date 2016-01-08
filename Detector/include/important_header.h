@@ -1,5 +1,14 @@
 #ifndef __MY_IMPORTANT_HEADER__
 #define __MY_IMPORTANT_HEADER__
+/**********************************************************
+ * 
+ * This file contains all includes and is 
+ * the copy of the first part of the program:
+ * http://www.tcpdump.org/pcap.html
+ * With the addition of the signal header in order 
+ * to process the sig int.
+ * 
+ **********************************************************/
 #include <pcap.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,7 +26,9 @@
 
 //Used in order to capture ctrl-c
 #include <signal.h>
-
+//Used to create a thread
+#include <pthread.h>
+#include <time.h>
 /* default snap length (maximum bytes per packet to capture) */
 #define SNAP_LEN 1518
 

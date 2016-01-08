@@ -183,6 +183,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
 return;
 }
+struct timespec _my_time; 
+
+bool break_thread = false;
 
 /**
  * Function called when a Ctrl-C is received:
@@ -194,13 +197,46 @@ void intHandler(int d){
 	printf("* Ctrl-C caught. Breaking the loop...*\n");
 	printf("**************************************\n");
 	pcap_breakloop(handle);
+	break_thread = true;
+}
+
+/** Function that control the score of all the nodes and set the score again to 0 */
+void controlScore(){
+	node_t * current = head;
+	while(current != NULL){
+		if(current->score >= PORT_SCAN_SCORE){
+			printf("*** SCAN FROM %s dectected ***\n", current->ip_src);
+		}
+		current->score = 0;
+		current = current->next;
+	}
 }
 
 
 
-/* https://www.sophos.com/en-us/support/knowledgebase/115153.aspx */
-int main(int argc, char * argv[]){
+void * thread_function(void * threadid){
+	printf("Hallo1 %ld\n", _my_time.tv_nsec);
+	while(!break_thread){
+		if(nanosleep(&_my_time, NULL) != 0){
+			perror("Nanosleep():");
+			break;
+		}
+		controlScore();
+	}
+	pthread_exit(NULL);
+}
 
+/* https://www.sophos.com/en-us/support/knowledgebase/115153.aspx */
+/**
+ * argv[0] program name
+ * -i define own ip not optional
+ * -d define own device (wlan0, eth0 and so on) optional
+ * -m maximum number of packets standard: infinity
+ */
+int main(int argc, char * argv[]){
+	_my_time.tv_sec = 0;
+	_my_time.tv_nsec = 300000000; //300ms
+	pthread_t _thread_time;
 	/* Variable declaration */
 	char *dev = NULL;								/* capture device name */
 	char errbuf[PCAP_ERRBUF_SIZE];					/* error buffer */
@@ -235,7 +271,12 @@ int main(int argc, char * argv[]){
 
 	/* print capture info */
 	printf("Device: %s\n", dev);
-	printf("Number of packets: %d\n", num_packets);
+	printf("Number of packets");
+
+	if(num_packets == -1)
+		printf("Infinity: i.e. until Ctrl-C occurs\n");
+	else 
+		printf("%d\n", num_packets);
 	printf("Filter expression: %s\n", filter_exp);
 
 	/* open capture device */
@@ -271,15 +312,22 @@ int main(int argc, char * argv[]){
 	/* Initializing the list of hosts that are trying to scan the target given in the rule (filter_exp) */
 	head = NULL;
 	
-	/* now we can set our callback function */
-	pcap_loop(handle, num_packets, got_packet, NULL);
-	print_list(head);
-	
+	int rc = pthread_create(&_thread_time, NULL, &thread_function, NULL);
+    if (!rc){
+
+    
+		/* now we can set our callback function */
+		pcap_loop(handle, num_packets, got_packet, NULL);
+		break_thread = true;
+		print_list(head);
+	} else {
+		printf("Error: cannot start create");
+	}
 	/* cleanup */
 	free_list(head);
 	pcap_freecode(&fp);
 	pcap_close(handle);
-
+	
 	printf("\nCapture complete.\n");
 	return EXIT_SUCCESS;
 }
