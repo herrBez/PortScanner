@@ -7,7 +7,8 @@ struct timespec _my_time;
 /** Function that control the score of all the nodes and set the score again to 0 */
 void controlScore(node_t * n){
 	if(n->actual_score >= PORT_SCAN_SCORE){
-		printf("*** SCAN FROM %s dectected ***\n", n->ip_src);
+		printf("*** SCAN FROM %s dectected [SYN %u,ACK %u ,FIN %u,NULL %u,XMAS %u, UNKNOWN %u] ***\n", 
+			n->ip_src, n->tcp_syn_scan, n->tcp_fin_scan, n->tcp_ack_scan, n->tcp_null_scan, n->tcp_xmas_scan, n->tcp_unknown_scan);
 		n->scan_detected++;
 	}
 	n->actual_score = 0;
@@ -26,7 +27,6 @@ void * thread_function(void * _node){
 		}
 		controlScore(n);
 	}
-	printf("JOINING\n");
 	return NULL;
 }
 

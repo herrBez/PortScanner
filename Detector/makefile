@@ -4,8 +4,8 @@ CC = gcc
 # compiler flags:
 #  -g    adds debugging information to the executable file
 #  -Wall turns on most, but not all, compiler warnings
-# 
-CFLAGS  = -g -Wfatal-errors -Werror -Wall
+# -Wfatal-errors to stop a the first error!
+CFLAGS  = -g  -Werror -Wall
 
 ADDITIONAL_FLAGS = -pthread -lpcap
 

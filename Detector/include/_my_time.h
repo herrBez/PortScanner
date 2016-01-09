@@ -5,6 +5,6 @@
 
 time_t my_now();
 void print_now();
-
+char * time_t_to_string(time_t t);
 
 #endif

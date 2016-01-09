@@ -64,6 +64,8 @@ void print_list_my_port(my_port * head){
 
     while (current != NULL) {
 		print_my_port(current);
+		if(current->next != NULL)
+			putchar(',');
         current = current->next;
     }
 }

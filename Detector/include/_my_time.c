@@ -17,3 +17,9 @@ void print_now(){
 	printf ( "Current local time and date: %s", asctime (timeinfo) );
 }
 
+char * time_t_to_string(time_t t){
+	return asctime (localtime(&t));
+}
+
+
+

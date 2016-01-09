@@ -1,10 +1,13 @@
 /* implementation of node_list.h */
 #include "node_list.h"
+#include "_my_time.h"
 
 void printNode(node_t * n){
-	printf("[Score = %d][SRC IP = %s][TCP=%d]", n->total_score, n->ip_src,n->tcp);
-	printf("[UDP=%d][ICMP=%d][IP=%d][UK=%d]", n->udp, n->icmp, n->ip, n->unknown);
-	printf("TCP PORTS{");
+	printf("\t[Score = %d][SRC IP = %s]", n->total_score, n->ip_src);
+	printf("[UDP=%d][ICMP=%d][IP=%d][UK=%d]\n", n->udp, n->icmp, n->ip, n->unknown);
+	printf("\t\t[TCP=%d][SYN %u, ACK %u, FIN %u, NULL %u, XMAS %u, UNKNWON %u]\n", 
+		n->tcp, n->tcp_syn_scan, n->tcp_fin_scan, n->tcp_ack_scan, n->tcp_null_scan, n->tcp_xmas_scan, n->tcp_unknown_scan);
+	printf("\tTCP PORTS{");
 	print_list_my_port(n->port_list);
 	printf("}\n");
 }
@@ -40,12 +43,20 @@ node_t * newNode(char * actual_adress){
 	n->total_score = 0;
 	n->actual_score = 0;
 	n->tcp = 0;
+	n->tcp_syn_scan = 0;
+	n->tcp_xmas_scan = 0;
+	n->tcp_ack_scan = 0;
+	n->tcp_null_scan = 0;
+	n->tcp_fin_scan = 0;
+	n->tcp_unknown_scan = 0;
 	n->port_list = NULL;
 	n->udp = 0;
 	n->icmp = 0;
 	n->unknown = 0;
 	n->ip = 0;
 	n->scan_detected = 0;
+	n->init_time = my_now();
+	n->end_time = my_now();
 	n->next = NULL;
 	return n;
 }

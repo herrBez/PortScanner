@@ -11,18 +11,25 @@
 
 
 typedef struct node {
-	unsigned int actual_score;
-	unsigned int total_score;
-	char * ip_src;
-	unsigned int tcp;
-	my_port * port_list;
-	int port_index;
-	unsigned int udp;
-	unsigned int icmp;
-	unsigned int unknown;
-	unsigned int ip;
-	unsigned int scan_detected;
+	unsigned int actual_score; 	/* actual_score: each 300 ms is reset to 0 */
+	unsigned int total_score; 
+	unsigned int udp; 			/* Counter of tcp packets */
+	unsigned int icmp; 			/* Counter of ICMP packets */
+	unsigned int unknown; 		/* Counter of packets with unknown protocol */
+	unsigned int ip; 			/* Counter of ip packets that are not udp, nor icmp, nor tcp */
+	unsigned int scan_detected; /* counter of detected scans */
+	unsigned int tcp; 			/* Counter of tcp packets received from  the ip_src */
+	unsigned int tcp_syn_scan;
+	unsigned int tcp_xmas_scan;
+	unsigned int tcp_ack_scan;
+	unsigned int tcp_null_scan;
+	unsigned int tcp_fin_scan;
+	unsigned int tcp_unknown_scan;
+	time_t init_time;
+	time_t end_time;
 	pthread_t thread;
+	my_port * port_list;
+	char * ip_src;
 	struct node *next;
 }node_t;
 
