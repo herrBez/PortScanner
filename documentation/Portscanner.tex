@@ -126,10 +126,9 @@
 	To function sendto() is used to send the created packet to the target machine and port. If the sending fails the program terminates with
 	an error, because then we cannot scan for open ports.
 	\begin{lstlisting}[frame= single, language=C, caption= C code to set port and calculate checksum in tcp header]
-	//Send the packet
 	if(sendto(s, datagram, packetsize, 0 , &dest, destsize)< 0)
 	{
-  perror("Error sending packet: ");
+	perror("Error sending packet: ");
 	exit(0);
 	}
 	\end{lstlisting}
@@ -147,24 +146,43 @@
  data_size = recvfrom(s, buffer, 65536, 0, &saddr, &saddr_size);
 	................................
  }else{
+  printf("Timeout, port %d filtered by firewall", port);
   return 0;
  }
 	\end{lstlisting}
 	Because it could be the case that we receive packets from other requests, we first have to check, if the received packet
-	is an answer to our request. To do so we use the IF-Statement of the Listing~\ref{lst:ifpacket}. It checks if the source port of the received packet equals the destination port of our sent packet and
+	is an answer to our request. To do so we use the IF-Statement of the Listing~\ref{lst:checkorigin}. It checks if the source port of the received packet equals the destination port of our sent packet and
 	if the source ip equals to the destination ip to which we sent the packet.
-	\begin{lstlisting}[frame= single, language=C, caption= IF statement to check origin of packet, label=lst:ifpacket]
+	\begin{lstlisting}[frame= single, language=C, caption= IF statement to check origin of packet, label=lst:checkorigin]
 	if(source.sin_addr.s_addr == dest_ip.s_addr &&
 	port == ntohs(tcph->source))
+	\end{lstlisting}
+	If the received packet passes the check, we know that we have the packet we were looking for. To test if the port is open we finally only have to check if the ack and syn flags are set in the tcp header
+	of the answer. To do so, we first extract the tcp header from our answer by using the length of the ip header as an offset. This works because the first bytes of our answer contain the ip header, which
+	is followed by the tcp header. As it can be seen in the listing~\ref{lst:synack}, we finally use an IF statement to check if the tcp header contains the flags which we desire. If it is the case, we know that the scanned
+	port is open.
+	\begin{lstlisting}[frame= single, language=C, caption=C code to check if answer contains syn and ack flag, label=lst:synack]
+	struct tcphdr *tcph=(struct tcphdr*)(buffer + iphdrlen);
+	
+	if(tcph->syn == 1 && tcph->ack == 1){
+	printf("Port: %d is open\n", port);
+	} 
 	\end{lstlisting}
 	\section{XMAS, TCP NULL and FIN scan}
 		\subsection{Theory}
 		
 		\subsection{Details of implementation}
 		The implementation of the XMAS, TCP NULL and FIN scan is quiet similar to the implementation of the syn scanner. In fact these four scan methods have very much in common.
-		They all need a raw socket to work. They only difference is in the way the tcp header flags are set and the way the scanner has to interpret the received packet.  
+		They all need a raw socket to work. There are only 2 main differences between this scan methods and the syn scan. The first one is that XMAS, NULL and FIN scan set different flags
+		in the tcp header. As the name suggests the NULL scan sets none of the flags and the FIN scan only sets the FIN flag. The XMAS scan sets the FIN, PSH, and URG flags, lighting the packet up like a Christmas tree.
+		The second difference of this three scan methods to the syn method is how the answer to the request is used to determine if a port is open or not. If we get a packet with the rst flag as an answer of one
+		of this three scan methods, we know the port is closed. If we don't get an answer we know that the server must have dropped the packet because of an illegal request (RFC 793).
 		
+		
+		
+		 
 	\section{Port Scan Detectors}
+	
 	
 	
 	

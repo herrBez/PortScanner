@@ -27,6 +27,7 @@ void printHelp(char * program_name){
 	printf("\t -n \t perform a NULL scan\n");
 	printf("\t -f \t perform a FIN scan\n");
 	printf("\t -x \t perform a XMAS scan\n");
+	printf("\t -m \t perform a Maimon scan\n");
 	printf("\nAuthors: Simon Targa, Mirko Bez\n");
 	exit(EXIT_SUCCESS);
 }
@@ -55,18 +56,18 @@ void parsePort(char * ports, portscanner * p){
 
 void getOptions(int argc, char * argv[], portscanner * p){
 	int opt;
-	while((opt = getopt(argc, argv, "phuvsnfx")) != -1) {
+	while((opt = getopt(argc, argv, "phuvsnfxm")) != -1) {
 		switch(opt){
 			case 'p': 
 				if(argc == optind){
-					fprintf("The option 'p' needs a portrange!! Exiting..\n");
+					printf("The option 'p' needs a portrange!! Exiting..\n");
 					exit(0);
 				}
 				parsePort(argv[optind], p); break;
 			case 'h': printHelp(argv[0]); break;
 			case 'u': 
 				if(argc == optind){
-					fprintf("The option 'u' needs an url!! Exiting..\n");
+					printf("The option 'u' needs an url!! Exiting..\n");
 					exit(0);
 				}
 				free(p->host_name); p->host_name = strdup(argv[optind]); break;
@@ -75,6 +76,8 @@ void getOptions(int argc, char * argv[], portscanner * p){
 			case 'n': p->method = 2; break;
 			case 'f': p->method = 3; break;
 			case 'x' : p->method = 4; break;
+			case 'm' : p->method = 5; break;
+
 		}
 	}
 }
@@ -190,6 +193,14 @@ void XmasScan(portscanner * p){
 	//int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
 }
 
+void MaimonScan(portscanner * p){
+	printf("Scanning %s using Maimon Scan\n", p->host_name);
+	printf("Range of ports = %d --> %d \n\n", p->min_port, p->max_port);
+	PortScan(p->min_port, p->max_port, p->host_name, 4);
+	/* CREATING THE RAW SOCKET */
+	//int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
+}
+
 
 
 
@@ -203,9 +214,11 @@ int main(int argc, char *argv[]) {
 	switch(p->method){
 		case 0: printf("I will perform a TCP scan\n"); TCPScan(p); break; 
 		case 1: printf("I will perform a SYN scan\n"); SYNScan(p); break;
-		case 2: printf("I will perform an NULL scan\n"); NullScan(p); break;
-		case 3: printf("I will perform an FIN scan\n"); FinScan(p); break;
-		case 4: printf("I will perform an XMAS scan\n"); XmasScan(p); break;
+		case 2: printf("I will perform a NULL scan\n"); NullScan(p); break;
+		case 3: printf("I will perform a FIN scan\n"); FinScan(p); break;
+		case 4: printf("I will perform a XMAS scan\n"); XmasScan(p); break;
+		case 5: printf("I will perform a Maimon scan\n"); MaimonScan(p); break;
+
 		default: printf("Method not recognized. Goodbye."); return EXIT_FAILURE;
 	}
 	

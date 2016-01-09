@@ -140,8 +140,11 @@ void PortScan (int startPort, int endPort, char* target, int method){
 		set_tcp_header(tcph , 0, 0, 0, 0, 0, 0);
 	else if (method == 2)
 		set_tcp_header(tcph , 1, 0, 0, 0, 0, 0);
-	else 
+	else if (method == 3)
 		set_tcp_header(tcph, 1, 0, 0, 1, 0, 1);
+	else
+		set_tcp_header(tcph , 1, 0, 0, 0, 1, 0);
+
 
      
 
@@ -196,6 +199,7 @@ void set_tcp_header(struct tcphdr *tcph , int fin, int syn, int rst, int psh, in
 
 
 void send_package(int port,  struct tcphdr *tcph, struct pseudo_header psh,  struct sockaddr_in  dest, int s, char* datagram, char * source_ip){
+	tcph->check=0;
 	tcph->dest = htons ( port );	 
 	psh.source_address = inet_addr( source_ip );
 	psh.dest_address = dest.sin_addr.s_addr;
@@ -261,7 +265,6 @@ int receive_packet(int s, int port, int method)
 		 
 				memset(&dest, 0, sizeof(dest));
 				dest.sin_addr.s_addr = iph->daddr;
-				
 				
 				//check if received packet is answer to the sent packet
 				if(source.sin_addr.s_addr == dest_ip.s_addr && port == ntohs(tcph->source))
