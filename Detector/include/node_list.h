@@ -1,30 +1,48 @@
 #ifndef __MY_NODE_LIST_H__
 #define __MY_NODE_LIST_H__
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <pthread.h>
-#include "port_list.h"
+#include "important_header.h"
 #define PORT_SCAN_SCORE 21
+
+#define INDEX_SYN		0
+#define INDEX_XMAS		1
+#define INDEX_ACK		2
+#define INDEX_MAIMON	3
+#define INDEX_NULL		4
+#define INDEX_FIN		5
+#define INDEX_UNKNOWN	6
+#define INDEX_TCP 		7
+
+/* Convert the constant to a readable string */
+char * index_to_string(int index);
 
 
 typedef struct node {
-	unsigned int actual_score; 	/* actual_score: each 300 ms is reset to 0 */
-	unsigned int total_score; 
-	unsigned int udp; 			/* Counter of tcp packets */
+	unsigned int ip; 			/* Counter of ip packets that are not udp, nor icmp, nor tcp */
 	unsigned int icmp; 			/* Counter of ICMP packets */
 	unsigned int unknown; 		/* Counter of packets with unknown protocol */
-	unsigned int ip; 			/* Counter of ip packets that are not udp, nor icmp, nor tcp */
-	unsigned int scan_detected; /* counter of detected scans */
+
+	/* TCP PROTOCOL PLACE HOLDERS */
+	unsigned int tcp_actual_score[INDEX_TCP + 1]; 	/* actual_score: each 300 ms is reset to 0 */
+	unsigned int tcp_total_score[INDEX_TCP + 1]; 
+	unsigned int tcp_scan_detected[INDEX_TCP + 1]; /* counter of detected scans */
 	unsigned int tcp; 			/* Counter of tcp packets received from  the ip_src */
-	unsigned int tcp_syn_scan;
-	unsigned int tcp_xmas_scan;
-	unsigned int tcp_ack_scan;
-	unsigned int tcp_null_scan;
-	unsigned int tcp_fin_scan;
-	unsigned int tcp_unknown_scan;
+	unsigned int tcp_syn;
+	unsigned int tcp_xmas;
+	unsigned int tcp_ack;
+	unsigned int tcp_null;
+	unsigned int tcp_fin;
+	unsigned int tcp_maimon;
+	unsigned int tcp_unknown;
+	
+	
+	/* UDP PROTOCOL PLACE HOLDERS */
+	unsigned int udp_actual_score; 	/* UDP is slower I will check it only after a while(300ms*10?)  */
+	unsigned int udp_total_score; 
+	unsigned int udp; 			/* Counter of tcp packets */
+	unsigned int udp_scan_detected;
+	
+	
 	time_t init_time;
 	time_t end_time;
 	pthread_t thread;
@@ -33,6 +51,8 @@ typedef struct node {
 	char * ip_src;
 	struct node *next;
 }node_t;
+
+
 
 node_t * newNode(char * actual_adress);
 

@@ -1,4 +1,4 @@
-#include "thread_file.h"
+#include "important_header.h"
 
 /* Extern variable initialized in the main function of port_scanner_detector.c */
 struct timespec _my_time; 
@@ -6,12 +6,24 @@ struct timespec _my_time;
 
 /** Function that control the score of all the nodes and set the score again to 0 */
 void controlScore(node_t * n){
-	if(n->actual_score >= PORT_SCAN_SCORE){
-		printf("*** SCAN FROM %s dectected [SYN %u,ACK %u ,FIN %u,NULL %u,XMAS %u, UNKNOWN %u] ***\n", 
-			n->ip_src, n->tcp_syn_scan, n->tcp_ack_scan, n->tcp_fin_scan, n->tcp_null_scan, n->tcp_xmas_scan, n->tcp_unknown_scan);
-		n->scan_detected++;
+	int i;
+	int tot_detected = 0;
+	for(i = 0; i <= INDEX_TCP; i++){
+		if(n->tcp_actual_score[i] >= PORT_SCAN_SCORE){
+			printf("*** %7s TCP SCAN FROM %s dectected\n", index_to_string(i), n->ip_src);
+			n->tcp_scan_detected[i]++;
+			tot_detected++;
+		}
+		n->tcp_actual_score[i] = 0;
 	}
-	n->actual_score = 0;
+	
+	if(n->udp_actual_score >= PORT_SCAN_SCORE){
+		printf("=== UDP SCAN FROM %s ===\n", n->ip_src);
+		n->udp_scan_detected++;
+	}
+	n->udp_actual_score = 0;
+	
+	
 }
 
 /** function passed to pthread_create() 
@@ -26,6 +38,7 @@ void * thread_function(void * _node){
 			break;
 		}
 		controlScore(n);
+		
 	}
 	return NULL;
 }

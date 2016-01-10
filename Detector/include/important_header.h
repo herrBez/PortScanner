@@ -102,6 +102,14 @@ struct sniff_tcp {
         u_short th_urp;                 /* urgent pointer */
 };
 
+/* Added from me */
+struct sniff_udp {
+        u_int16_t src_port;
+        u_int16_t dst_port;
+        u_int16_t len;
+        u_int16_t check;
+};
+
 #include "./flag_utility.h"
 
 
