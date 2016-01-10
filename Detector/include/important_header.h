@@ -29,6 +29,8 @@
 #include "./port_list.h"
 #include "./node_list.h"
 #include "./thread_file.h"
+#include "./print_info.h"
+
 /* Used in order to capture ctrl-c */
 #include <signal.h>
 /* Used to create a thread */
@@ -36,6 +38,8 @@
 #include <time.h>
 
 #include "./_my_time.h"
+#include "./output_file_utility.h"
+
 /* default snap length (maximum bytes per packet to capture) */
 #define SNAP_LEN 1518
 
@@ -98,6 +102,7 @@ struct sniff_tcp {
         u_short th_urp;                 /* urgent pointer */
 };
 
+#include "./flag_utility.h"
 
 
 #endif

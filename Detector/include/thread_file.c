@@ -8,7 +8,7 @@ struct timespec _my_time;
 void controlScore(node_t * n){
 	if(n->actual_score >= PORT_SCAN_SCORE){
 		printf("*** SCAN FROM %s dectected [SYN %u,ACK %u ,FIN %u,NULL %u,XMAS %u, UNKNOWN %u] ***\n", 
-			n->ip_src, n->tcp_syn_scan, n->tcp_fin_scan, n->tcp_ack_scan, n->tcp_null_scan, n->tcp_xmas_scan, n->tcp_unknown_scan);
+			n->ip_src, n->tcp_syn_scan, n->tcp_ack_scan, n->tcp_fin_scan, n->tcp_null_scan, n->tcp_xmas_scan, n->tcp_unknown_scan);
 		n->scan_detected++;
 	}
 	n->actual_score = 0;

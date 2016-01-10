@@ -6,9 +6,9 @@ void printNode(node_t * n){
 	printf("\t[Score = %d][SRC IP = %s]", n->total_score, n->ip_src);
 	printf("[UDP=%d][ICMP=%d][IP=%d][UK=%d]\n", n->udp, n->icmp, n->ip, n->unknown);
 	printf("\t\t[TCP=%d][SYN %u, ACK %u, FIN %u, NULL %u, XMAS %u, UNKNWON %u]\n", 
-		n->tcp, n->tcp_syn_scan, n->tcp_fin_scan, n->tcp_ack_scan, n->tcp_null_scan, n->tcp_xmas_scan, n->tcp_unknown_scan);
+		n->tcp, n->tcp_syn_scan, n->tcp_ack_scan, n->tcp_fin_scan, n->tcp_null_scan, n->tcp_xmas_scan, n->tcp_unknown_scan);
 	printf("\tTCP PORTS{");
-	print_list_my_port(n->port_list);
+	print_list_my_port(n->tcp_port_list);
 	printf("}\n");
 }
 
@@ -49,7 +49,8 @@ node_t * newNode(char * actual_adress){
 	n->tcp_null_scan = 0;
 	n->tcp_fin_scan = 0;
 	n->tcp_unknown_scan = 0;
-	n->port_list = NULL;
+	n->tcp_port_list = NULL;
+	n->udp_port_list = NULL;
 	n->udp = 0;
 	n->icmp = 0;
 	n->unknown = 0;
@@ -108,7 +109,8 @@ void free_list(node_t * head){
 	node_t * curr;
 	while ((curr = head) != NULL) { 
 		head = head->next;          
-		free(curr->port_list);
+		free(curr->tcp_port_list);
+		free(curr->udp_port_list);
 		free (curr->ip_src);
 		free (curr);                
 	}

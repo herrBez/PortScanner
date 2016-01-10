@@ -109,6 +109,9 @@ void TCPScan(portscanner * p){
 
     memset(&server, 0, sizeof (server));
 	/** N.B. GETHOSTBYNAME IS OBSOLETE */
+	
+	
+	
     hostname = gethostbyname(p->host_name);
 	printf("ADDRR[%d] ?? %s\n", hostname->h_length, hostname->h_addr_list[0]);
 

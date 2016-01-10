@@ -28,7 +28,8 @@ typedef struct node {
 	time_t init_time;
 	time_t end_time;
 	pthread_t thread;
-	my_port * port_list;
+	my_port * tcp_port_list;
+	my_port * udp_port_list;
 	char * ip_src;
 	struct node *next;
 }node_t;
