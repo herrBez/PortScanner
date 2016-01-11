@@ -248,7 +248,7 @@ int receive_packet(int s, int port, int method)
 				printf("Port: %d is open\n", port);
 			}
 			if(method ==0){
-				printf("Received timeout, port %d coulb be filtered by firewal", port);
+				printf("Received timeout, port %d could be filtered by firewall\n", port);
 			}
 			return 0;
 		}
@@ -309,78 +309,69 @@ char* hostname_to_ip(char * hostname)
 }
  
 /*
- Get source IP of system , like 192.168.0.6 or 192.168.1.2
- */
+*  Get source IP of system , like 192.168.0.6 or 192.168.1.2
+ * Based on code from: http://www.binarytides.com/get-local-ip-c-linux/
+ * */
  
-int get_local_ip ( char * buffer)
-{
-	const char* google_dns_server = "8.8.8.8";
-	int dns_port = 53;
+ int get_local_ip ( char * buffer){
+	FILE *f;
+    char line[100] , *p , *c;
+    buffer[0] = 0;
      
-    struct sockaddr_in serv;
+    f = fopen("/proc/net/route" , "r");
      
-    int sock = socket ( AF_INET, SOCK_DGRAM, 0);
-     
-    //Socket could not be created
-    if(sock < 0)
+    while(fgets(line , 100 , f))
     {
-        perror("Socket error");
-    }
-     
-    memset( &serv, 0, sizeof(serv) );
-    serv.sin_family = AF_INET;
-    serv.sin_addr.s_addr = inet_addr( google_dns_server );
-    serv.sin_port = htons( dns_port );
- 
-    int err = connect( sock , (const struct sockaddr*) &serv , sizeof(serv) );
-     
-    struct sockaddr_in name;
-    socklen_t namelen = sizeof(name);
-    err = getsockname(sock, (struct sockaddr*) &name, &namelen);
+        p = strtok(line , " \t");
+        c = strtok(NULL , " \t");
          
-    const char* p = inet_ntop(AF_INET, &name.sin_addr, buffer, 100);
-         
-    if(p != NULL)
-    {
-        printf("Local ip is : %s \n" , buffer);
+        if(p!=NULL && c!=NULL)
+        {
+            if(strcmp(c , "00000000") == 0)
+            {
+				//Found default interface
+                break;
+            }
+        }
     }
-    else
+     
+    //which family do we require , AF_INET or AF_INET6
+    int fm = AF_INET;
+    struct ifaddrs *ifaddr, *ifa;
+    int family , s;
+
+ 
+    if (getifaddrs(&ifaddr) == -1)
     {
-        //Some error
-        printf ("Error number : %d . Error message : %s \n" , errno , strerror(errno));
+		perror("getifaddrs");
+        return(EXIT_FAILURE);
     }
  
-    close(sock);
+    //Walk through linked list, maintaining head pointer so we can free list later
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next){
+        if (ifa->ifa_addr == NULL)
+            continue;
+        
+        family = ifa->ifa_addr->sa_family;
+ 
+		if(strcmp( ifa->ifa_name , p) == 0){
+            if (family == fm){
+				s = getnameinfo( ifa->ifa_addr, (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6) , buffer , NI_MAXHOST , NULL , 0 , NI_NUMERICHOST);
+				if (s!= 0){
+					perror("getnameinfo() failed:");
+					return(EXIT_FAILURE);
+				}
+            }
+          
+        }
+    }
+
+
+    freeifaddrs(ifaddr);
+    if(strlen(buffer)==0){
+		sprintf(buffer, "127.0.0.1");
+	}
      
     return 0;
-   
-   /*
-    int sock = socket ( AF_INET, SOCK_DGRAM, 0);
- 
-    struct sockaddr_in dst;
-    dst.sin_family = AF_INET;
-
- 
-    int err = connect( sock , (const struct sockaddr*) &dst , sizeof(dst) );
-    if(err<0){
-		return err;
-	}
-
-	socklen_t alen = sizeof(dst);
-
- 
-   // struct sockaddr_in name;
-    err = getsockname(sock, (struct sockaddr*) &dst, &alen);
-    if(err<0){
-		return err;
-	}
- 
-    const char *p = inet_ntop(AF_INET, &dst.sin_addr, buffer, 100);
- 
-	printf("Source %s\n", inet_ntoa(dst.sin_addr));
-	buffer = inet_ntoa(dst.sin_addr);
-	printf("%s", buffer);
-    close(sock);
-    return 1;
-    * */
 }
+

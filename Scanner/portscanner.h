@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <netinet/tcp.h>   //Provides declarations for tcp header
 #include <netinet/ip.h>    //Provides declarations for ip header
+#include <ifaddrs.h>
 
 #include <regex.h>   
 
