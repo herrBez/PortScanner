@@ -74,11 +74,10 @@ void output_file_f(char * output_file_name, node_t * head, time_t begin_time, ti
 		src = 0;
 		while (current != NULL) {
 			src++;
-			fprint_tabs(output, tabs);
 			tot_scan_detected += current->tcp_scan_detected[INDEX_TCP];
 			if(current->tcp_scan_detected[INDEX_TCP] != 0)
 				diff_sources++;
-			fprintf(output, "%d & %s & %3u & %3u & %3u & %3u & %3u & %3u & %3u & %3u & %3u\\\\ \n",
+			fprintf(output, "%d & %s & %3u & %3u & %3u & %3u & %3u & %3u & %3u & %3u & %3u\\\\ ",
 				src, current->ip_src, current->tcp, current->tcp_scan_detected[INDEX_TCP], current->tcp_syn, current->tcp_fin,
 				current->tcp_xmas, current->tcp_null, current->tcp_ack, current->tcp_maimon, current->tcp_unknown);
 			
@@ -91,9 +90,9 @@ void output_file_f(char * output_file_name, node_t * head, time_t begin_time, ti
 		
 		
 		fprintf(output, "\\subsection{Type of TCP SCAN DETECTED}\n");
-		fprintf(output, "\\begin{tabular}{| c | c | c |}\n");
+		fprintf(output, "\\begin{tabular}{| c | c | c | c | c | c | c | c | c | }\n");
 		fprintf(output, "\\hline \n");
-		fprintf(output, "IP-Address & Type & Times \\\\ \n");
+		fprintf(output, "IP-Address &  SYN & XMAS & ACK & MAIMON & NULL & FIN & UK & TCP \\\\ \n");
 		fprintf(output, "\\hline \n");
 		current = head;
 		
@@ -102,8 +101,9 @@ void output_file_f(char * output_file_name, node_t * head, time_t begin_time, ti
 			for(i = 0; i <= INDEX_TCP; i++){
 				if(i == 0)
 					fprintf(output, "%s", current->ip_src);
-				fprintf(output, "& %s & %u \\\\ ", index_to_string(i), current->tcp_scan_detected[i]);
+				fprintf(output, "& %u ", current->tcp_scan_detected[i]);
 			}
+			fprintf(output, " \\\\ ");
 			
 			current = current->next;
 		}
