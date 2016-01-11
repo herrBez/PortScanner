@@ -8,7 +8,6 @@
 
 //#include <arpa/inet.h>
 #include "portscanner.h"
-#include "raw_socket_scan.h"
 
 
 
@@ -113,7 +112,6 @@ void TCPScan(portscanner * p){
 	
 	
     hostname = gethostbyname(p->host_name);
-	printf("ADDRR[%d] ?? %s\n", hostname->h_length, hostname->h_addr_list[0]);
 
 
     memcpy( (char *)&server.sin_addr, hostname->h_addr_list[0], hostname->h_length);

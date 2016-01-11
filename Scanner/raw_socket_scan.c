@@ -4,15 +4,7 @@
  * Syn, Null, Fin, Xmas
 */
  
-#include<stdio.h> 
-#include<string.h> 
-#include<stdlib.h> 
-#include<sys/socket.h>
-#include<errno.h> 
-#include<netdb.h> 
-#include<arpa/inet.h>
-#include<netinet/tcp.h>   
-#include<netinet/ip.h>    
+#include "portscanner.h"  
  
 void * receive_ack( void *ptr );
 int receive_packet(int s, int port, int method);
@@ -25,38 +17,10 @@ void set_tcp_header(struct tcphdr *tcph , int fin, int syn, int rst, int psh, in
 
 
  
-struct pseudo_header    //needed for checksum calculation
-{
-    unsigned int source_address;
-    unsigned int dest_address;
-    unsigned char placeholder;
-    unsigned char protocol;
-    unsigned short tcp_length;
-     
-    struct tcphdr tcp;
-};
- 
+
 struct in_addr dest_ip;
 
 void send_package(int port,  struct tcphdr *tcph, struct pseudo_header psh,  struct sockaddr_in  dest, int s, char* datagram, char * source_ip);
-
- 
-int main(int argc, char *argv[])
-{
-    char *target = argv[1];
-     
-    if(argc < 2)
-    {
-        printf("Please specify a hostname \n");
-        exit(1);
-    }
-     
-     PortScan(1, 6000, target, 1);
-          
-    return 0;
-}
-
-
 
 /**
  * Function to scan ports
@@ -69,13 +33,10 @@ void PortScan (int startPort, int endPort, char* target, int method){
     int s = socket (AF_INET, SOCK_RAW , IPPROTO_TCP);
     if(s < 0)
     {
-        printf ("Error creating socket. Error number : %d . Error message : %s \n" , errno , strerror(errno));
+        fprintf (stderr, "Error creating socket. Error number : %d . Error message : %s \n" , errno , strerror(errno));
         exit(0);
     }
-    else
-    {
-        printf("Socket created.\n");
-    }
+    
     
     
     //Datagram to represent the packet
@@ -100,7 +61,7 @@ void PortScan (int startPort, int endPort, char* target, int method){
         char *ip = hostname_to_ip(target);
         if(ip != NULL)
         {
-            printf("%s resolved to %s \n" , target , ip);
+            //printf("%s resolved to %s \n" , target , ip);
             //Convert domain name to IP
             dest_ip.s_addr = inet_addr( hostname_to_ip(target) );
         }
@@ -114,7 +75,7 @@ void PortScan (int startPort, int endPort, char* target, int method){
     char source_ip[20];
     get_local_ip( source_ip );
      
-    printf("Local source IP is %s \n" , source_ip);
+    //printf("Local source IP is %s \n" , source_ip);
      
     memset (datagram, 0, 4096); /* zero out the buffer */
      
@@ -137,9 +98,14 @@ void PortScan (int startPort, int endPort, char* target, int method){
     if(method == 0)
 		set_tcp_header(tcph , 0, 1, 0, 0, 0, 0);
 	else if (method == 1)
+		set_tcp_header(tcph , 0, 0, 0, 0, 0, 0);
+	else if (method == 2)
 		set_tcp_header(tcph , 1, 0, 0, 0, 0, 0);
-	else
+	else if (method == 3)
 		set_tcp_header(tcph, 1, 0, 0, 1, 0, 1);
+	else
+		set_tcp_header(tcph , 1, 0, 0, 0, 1, 0);
+
 
      
 
@@ -161,16 +127,16 @@ void PortScan (int startPort, int endPort, char* target, int method){
     dest.sin_addr.s_addr = dest_ip.s_addr;
     
 
-    for(port = startPort ; port <=endPort ;)
+    for(port = startPort ; port <=endPort ;port++)
     {
-		port++;
 		send_package(port, tcph, psh, dest, s, datagram, source_ip);
 		
 		int result = receive_packet(s, port, method);
 		while (result < 0){
 			result = receive_packet(s, port, method);
 
-		 } 
+		 }
+		 
 	 }
 	
 }
@@ -179,10 +145,9 @@ void PortScan (int startPort, int endPort, char* target, int method){
 void set_tcp_header(struct tcphdr *tcph , int fin, int syn, int rst, int psh, int ack, int urg){
 	int source_port = 43591;
 	tcph->source = htons ( source_port );
-    tcph->dest = htons (80);
     tcph->seq = htonl(1105024978);
     tcph->ack_seq = 0;
-    tcph->doff = sizeof(struct tcphdr) / 4;      //Size of tcp header
+    tcph->doff = sizeof(struct tcphdr) / 4;     
     tcph->fin=fin;
     tcph->syn=syn;
     tcph->rst=rst;
@@ -190,15 +155,13 @@ void set_tcp_header(struct tcphdr *tcph , int fin, int syn, int rst, int psh, in
     tcph->ack=ack;
     tcph->urg=urg;
     tcph->window = htons ( 14600 );  // maximum allowed window size
-    tcph->check = 0; //if you set a checksum to zero, your kernel's IP stack should fill in the correct checksum during transmission
     tcph->urg_ptr = 0;
 }
 
 
 void send_package(int port,  struct tcphdr *tcph, struct pseudo_header psh,  struct sockaddr_in  dest, int s, char* datagram, char * source_ip){
-	tcph->dest = htons ( port );
-	tcph->check = 0; // if you set a checksum to zero, your kernel's IP stack should fill in the correct checksum during transmission
-	 
+	tcph->check=0;
+	tcph->dest = htons ( port );	 
 	psh.source_address = inet_addr( source_ip );
 	psh.dest_address = dest.sin_addr.s_addr;
 	psh.placeholder = 0;
@@ -212,7 +175,8 @@ void send_package(int port,  struct tcphdr *tcph, struct pseudo_header psh,  str
 	//Send the packet
 	if ( sendto (s, datagram , sizeof(struct iphdr) + sizeof(struct tcphdr) , 0 , (struct sockaddr *) &dest, sizeof (dest)) < 0)
 	{
-		printf ("Error sending syn packet. Error number : %d . Error message : %s \n" , errno , strerror(errno));
+		//printf ("Error sending syn packet. Error number : %d . Error message : %s \n" , errno , strerror(errno));
+		perror("Error sending packet: ");
 		exit(0);
 	}
 	}
@@ -228,7 +192,7 @@ void send_package(int port,  struct tcphdr *tcph, struct pseudo_header psh,  str
  */
 int receive_packet(int s, int port, int method)
 {
-		unsigned char *buffer = (unsigned char *)malloc(65536); //Its Big
+		unsigned char *buffer = (unsigned char *)malloc(65536); 
 		struct timeval tv;
 		fd_set fds;
 		struct sockaddr saddr;
@@ -240,7 +204,7 @@ int receive_packet(int s, int port, int method)
 		FD_SET(s, &fds);
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
-		select(s+ 1, &fds, NULL, NULL, &tv);
+		select(s + 1, &fds, NULL, NULL, &tv);
 
 		
 		if (FD_ISSET(s, &fds))
@@ -251,7 +215,7 @@ int receive_packet(int s, int port, int method)
 			struct sockaddr_in source,dest;
 			unsigned short iphdrlen;
      
-			if(iph->protocol == 6)
+			if(iph->protocol == IPPROTO_TCP)
 			{	
 				iphdrlen = iph->ihl*4;
 
@@ -262,7 +226,6 @@ int receive_packet(int s, int port, int method)
 		 
 				memset(&dest, 0, sizeof(dest));
 				dest.sin_addr.s_addr = iph->daddr;
-				
 				
 				//check if received packet is answer to the sent packet
 				if(source.sin_addr.s_addr == dest_ip.s_addr && port == ntohs(tcph->source))
@@ -351,6 +314,47 @@ char* hostname_to_ip(char * hostname)
  
 int get_local_ip ( char * buffer)
 {
+	const char* google_dns_server = "8.8.8.8";
+	int dns_port = 53;
+     
+    struct sockaddr_in serv;
+     
+    int sock = socket ( AF_INET, SOCK_DGRAM, 0);
+     
+    //Socket could not be created
+    if(sock < 0)
+    {
+        perror("Socket error");
+    }
+     
+    memset( &serv, 0, sizeof(serv) );
+    serv.sin_family = AF_INET;
+    serv.sin_addr.s_addr = inet_addr( google_dns_server );
+    serv.sin_port = htons( dns_port );
+ 
+    int err = connect( sock , (const struct sockaddr*) &serv , sizeof(serv) );
+     
+    struct sockaddr_in name;
+    socklen_t namelen = sizeof(name);
+    err = getsockname(sock, (struct sockaddr*) &name, &namelen);
+         
+    const char* p = inet_ntop(AF_INET, &name.sin_addr, buffer, 100);
+         
+    if(p != NULL)
+    {
+        printf("Local ip is : %s \n" , buffer);
+    }
+    else
+    {
+        //Some error
+        printf ("Error number : %d . Error message : %s \n" , errno , strerror(errno));
+    }
+ 
+    close(sock);
+     
+    return 0;
+   
+   /*
     int sock = socket ( AF_INET, SOCK_DGRAM, 0);
  
     struct sockaddr_in dst;
@@ -375,6 +379,8 @@ int get_local_ip ( char * buffer)
  
 	printf("Source %s\n", inet_ntoa(dst.sin_addr));
 	buffer = inet_ntoa(dst.sin_addr);
+	printf("%s", buffer);
     close(sock);
     return 1;
+    * */
 }

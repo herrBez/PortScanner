@@ -14,7 +14,23 @@
 
 #include <regex.h>   
 
+#include <errno.h>
 
+#include <netdb.h> 
+#include <arpa/inet.h>
+   
+
+struct pseudo_header    //needed for checksum calculation
+{
+    unsigned int source_address;
+    unsigned int dest_address;
+    unsigned char placeholder;
+    unsigned char protocol;
+    unsigned short tcp_length;
+     
+    struct tcphdr tcp;
+};
+ 
 
 
 /**
@@ -31,8 +47,7 @@ typedef struct my_port_scanner{
 
 
 
-
-
+void PortScan (int startPort, int endPort, char* target, int method);
 void destroyPortScanner(portscanner * p);
 portscanner * newPortScanner();
 #endif
