@@ -4,14 +4,17 @@
 #include "important_header.h"
 #define PORT_SCAN_SCORE 21
 
-#define INDEX_SYN		0
-#define INDEX_XMAS		1
-#define INDEX_ACK		2
-#define INDEX_MAIMON	3
-#define INDEX_NULL		4
-#define INDEX_FIN		5
-#define INDEX_UNKNOWN	6
-#define INDEX_TCP 		7
+#define INDEX_TCP 		0
+#define INDEX_SYN		1
+#define INDEX_XMAS		2
+#define INDEX_ACK		3
+#define INDEX_MAIMON	4
+#define INDEX_NULL		5
+#define INDEX_FIN		6
+#define INDEX_UNKNOWN	7 
+
+
+#define INDEX_SIZE INDEX_UNKNOWN+1 
 
 /* Convert the constant to a readable string */
 char * index_to_string(int index);
@@ -21,19 +24,15 @@ typedef struct node {
 	unsigned int ip; 			/* Counter of ip packets that are not udp, nor icmp, nor tcp */
 	unsigned int icmp; 			/* Counter of ICMP packets */
 	unsigned int unknown; 		/* Counter of packets with unknown protocol */
+	
 
+	
 	/* TCP PROTOCOL PLACE HOLDERS */
-	unsigned int tcp_actual_score[INDEX_TCP + 1]; 	/* actual_score: each 300 ms is reset to 0 */
-	unsigned int tcp_total_score[INDEX_TCP + 1]; 
-	unsigned int tcp_scan_detected[INDEX_TCP + 1]; /* counter of detected scans */
-	unsigned int tcp; 			/* Counter of tcp packets received from  the ip_src */
-	unsigned int tcp_syn;
-	unsigned int tcp_xmas;
-	unsigned int tcp_ack;
-	unsigned int tcp_null;
-	unsigned int tcp_fin;
-	unsigned int tcp_maimon;
-	unsigned int tcp_unknown;
+	unsigned int tcp_actual_score[INDEX_SIZE]; 	/* actual_score: each 300 ms is reset to 0 */
+	unsigned int tcp_total_score[INDEX_SIZE]; 
+	unsigned int tcp_scan_detected[INDEX_SIZE]; /* counter of detected scans */
+	unsigned int tcp[INDEX_SIZE]; 			/* Counter of tcp packets received from  the ip_src */
+	
 	
 	
 	/* UDP PROTOCOL PLACE HOLDERS */
@@ -54,10 +53,10 @@ typedef struct node {
 
 
 
-node_t * newNode(char * actual_adress);
+node_t * new_node(char * actual_adress);
 
 /* print a single node */
-void printNode(node_t * n);
+void print_node(node_t * n);
 /* Print all element of a list using the function printNode */
 void print_list(node_t * head);
 /* 

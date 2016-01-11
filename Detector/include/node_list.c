@@ -1,21 +1,24 @@
 /* implementation of node_list.h */
 #include "important_header.h"
 
-void printNode(node_t * n){
+void print_node(node_t * n){
 	int i;
 	
 	printf("Potential Port Scanner IP: %s\n", n->ip_src);
 	printf("\t*** Summary: received packets ***\n");
-	printf("\t[TCP=%u][UDP=%u][ICMP=%u][IP=%u][UNKNOWN=%u]\n", n->tcp, n->udp, n->icmp, n->ip, n->unknown);
+	printf("\t[TCP=%u][UDP=%u][ICMP=%u][IP=%u][UNKNOWN=%u]\n", n->tcp[INDEX_TCP], n->udp, n->icmp, n->ip, n->unknown);
 	printf("\t*** TCP PROTOCOL ***\n");
-	printf("\t\t[TCP=%d][SYN %u, ACK %u, FIN %u, NULL %u, XMAS %u, MAIMON %u, UNKNWON %u]\n", 
-		n->tcp, n->tcp_syn, n->tcp_ack, n->tcp_fin, n->tcp_null, n->tcp_xmas, n->tcp_maimon, n->tcp_unknown);
+	printf("\t\t");
+	for(i = 0; i < INDEX_SIZE; i++){
+		printf("[%s=%u]", index_to_string(i), n->tcp[i]);
+	}
+	printf("\n");
 	
-	for(i = 0; i <= INDEX_TCP; i++){
+	for(i = 0; i < INDEX_SIZE; i++){
 		printf("\t\t\tTOT SCORE[%7s]:\t\t%3u\n", index_to_string(i), n->tcp_total_score[i]);
 	}
 	printf("\t\t\t *** \t\t\t\n");
-	for(i = 0; i <= INDEX_TCP; i++){
+	for(i = 0; i < INDEX_SIZE; i++){
 		printf("\t\t\tScan [%7s] detected:\t %d\n", index_to_string(i), n->tcp_scan_detected[i]);
 	}
 	printf("\t\tTCP PORTS{");
@@ -61,31 +64,25 @@ void print_list(node_t * head){
     while (current != NULL) {
 		printf("***********************************************************************\n\n");
 		printf("#%d. ", i++);
-		printNode(current);
+		print_node(current);
 		printf("\n************************************************************************\n\n");
         current = current->next;
     }
 }
 
-node_t * newNode(char * actual_adress){
+node_t * new_node(char * actual_adress){
 	node_t * n = malloc(sizeof(node_t));
 	n->ip_src = malloc(sizeof(char) * (strlen(actual_adress) + 1));
 	strcpy(n->ip_src, actual_adress);
 	int i;
-	for(i = 0; i <= INDEX_TCP; i++){
+	for(i = 0; i < INDEX_SIZE; i++){
 		n->tcp_total_score[i] = 0;
 		n->tcp_actual_score[i] = 0;
 		n->tcp_scan_detected[i] = 0;
+		n->tcp[i] = 0;
 	}
 	
-	n->tcp = 0;
-	n->tcp_syn = 0;
-	n->tcp_xmas = 0;
-	n->tcp_ack = 0;
-	n->tcp_null = 0;
-	n->tcp_fin = 0;
-	n->tcp_maimon = 0;
-	n->tcp_unknown = 0;
+	
 	n->tcp_port_list = NULL;
 	n->udp_port_list = NULL;
 	n->udp = 0;
@@ -125,13 +122,13 @@ bool contains(node_t * head, char * ip_src){
 	return contains_node(head,ip_src) != NULL;
 }
 
-
+/* This implementation assume that you already checked if the element is contained */
 void push(node_t ** head, char * ip_src) {
 	node_t * current = *head;
 
 	if(*head == NULL){
 		//printf("Adding the first element %s \n", ip_src);
-		*head = newNode(ip_src);
+		*head = new_node(ip_src);
 		return;
 	}
     while (current->next != NULL) {
@@ -139,7 +136,7 @@ void push(node_t ** head, char * ip_src) {
     }
 
     /* now we can add a new variable */
-    current->next = newNode(ip_src);
+    current->next = new_node(ip_src);
 }
 
 

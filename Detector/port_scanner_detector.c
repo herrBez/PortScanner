@@ -154,27 +154,21 @@ void process_tcp(const u_char *packet, const struct sniff_ip *ip, int size_ip, n
 	int index;
 	if(tcp->th_flags == get_syn_scan_flags()){
 		index = INDEX_SYN;
-		actual_node->tcp_syn++;
 		printf("SYN\n");
 	} else if(tcp->th_flags == get_ack_scan_flags()){
 		index = INDEX_ACK;
-		actual_node->tcp_ack++;
 		printf("ACK\n");
 	} else if(tcp->th_flags == get_null_scan_flags()){
 		index = INDEX_NULL;
-		actual_node->tcp_null++;
 		printf("NULL\n");
 	} else if(tcp->th_flags == get_xmas_scan_flags()){
 		index = INDEX_XMAS;
-		actual_node->tcp_xmas++;
 		printf("XMAS\n");
 	} else if(tcp->th_flags == get_fin_scan_flags()){
 		index = INDEX_FIN;
-		actual_node->tcp_fin++;
 		printf("FIN\n");
 	} else if(tcp->th_flags == get_maimon_scan_flags()){
 		index = INDEX_MAIMON;
-		actual_node->tcp_maimon++;
 		printf("MAIMON (FIN | ACK)\n");
 	}
 	else {
@@ -182,10 +176,9 @@ void process_tcp(const u_char *packet, const struct sniff_ip *ip, int size_ip, n
 		printf("Not known scan type (Flag set to 0x%X := ", tcp->th_flags);
 		print_tcp_flags(tcp->th_flags);
 		printf(")\n");
-		actual_node->tcp_unknown++;
 	}
 	
-	
+	actual_node->tcp[index]++;
 	
 	
 	printf("   Src port: %d\n", ntohs(tcp->th_sport));
@@ -215,6 +208,7 @@ void process_tcp(const u_char *packet, const struct sniff_ip *ip, int size_ip, n
 	actual_node->tcp_total_score[INDEX_TCP] += tmp;
 	actual_node->tcp_actual_score[index] += tmp;
 	actual_node->tcp_total_score[index] += tmp;
+	
 
 	/* compute tcp payload (segment) size */
 	size_payload = ntohs(ip->ip_len) - (size_ip + size_tcp);
@@ -294,7 +288,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 	/* determine protocol */	
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
-			actual_node->tcp++;
+			actual_node->tcp[INDEX_TCP]++;
 			printf("   Protocol: TCP\n");
 			process_tcp(packet, ip, size_ip, actual_node);
 			break;
