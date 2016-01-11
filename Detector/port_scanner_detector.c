@@ -53,7 +53,7 @@ void my_get_options(int argc, char * argv[], char **dev, int * num_packets, char
 		{0,0,0,0}, //In order to recognize the end of the array
 	};
 	
-	while((opt = getopt_long(argc, argv, "hsd:m:i:vl", opts, &option_index)) != -1){
+	while((opt = getopt_long(argc, argv, "hsd:m:i:vl:", opts, &option_index)) != -1){
 		switch(opt){
 			case 'h': printHelp(argv[0]); 
 				break;
@@ -71,8 +71,7 @@ void my_get_options(int argc, char * argv[], char **dev, int * num_packets, char
 					*verbose = true;
 					break;
 			case 'l':
-					
-					*output_file_name = strdup(optarg); printf("DST IP %s\n", *output_file_name);
+					*output_file_name = strdup(optarg); printf("OUTPUT FILE NAME %s\n", *output_file_name);
 					break;  
 		}
 	}
@@ -96,6 +95,134 @@ void my_sigint_handler(int d){
 	break_thread = true;
 }
 
+int get_score(int dst_port){
+	if(dst_port <= 0)
+		fprintf(stderr, "ERROR PORT NEGATIVE\n");
+	else if(dst_port > 65536)
+		fprintf(stderr, "ERROR PORT TOO BIG\n");
+	else if(dst_port == 11 || dst_port == 12 || dst_port == 13 || dst_port == 2000){
+		return 10;
+	}
+	else if(dst_port < 1024){
+		return 3;
+	}
+	else if(dst_port >= 1024){
+		return 1;
+	}
+	return 0;
+}
+
+void process_udp(const u_char *packet, const struct sniff_ip *ip, int size_ip, node_t * actual_node){
+	const struct sniff_udp *udp;
+	int dst_port;
+	udp = (struct sniff_udp*)(packet + SIZE_ETHERNET + size_ip);
+	dst_port =  ntohs(udp->dst_port);
+	printf("UDP DEST PORT %d\n", dst_port);
+	int tmp = get_score(dst_port);
+	actual_node->udp_actual_score += tmp;
+	actual_node->udp_total_score += tmp;
+	if(_get_all_info){
+		printf("GET ALL INFO UDP\n");
+		if(actual_node->udp_port_list == NULL){
+			actual_node->udp_port_list = new_my_port(dst_port);
+		} else {
+			my_port * actual_port = contains_my_port(actual_node->udp_port_list, dst_port);
+			if(actual_port == NULL){
+				push_my_port(&actual_node->udp_port_list, dst_port);	
+			} else {
+				actual_port->times++;
+			}
+		
+		}	
+	}	
+}
+
+void process_tcp(const u_char *packet, const struct sniff_ip *ip, int size_ip, node_t * actual_node){
+	int dst_port;
+	int size_tcp;
+	int size_payload;
+	const struct sniff_tcp *tcp;            /* The TCP header */
+	/* define/compute tcp header offset */
+	tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+	size_tcp = TH_OFF(tcp)*4;
+	if (size_tcp < 20) {
+		printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
+		return;
+	}
+	dst_port = ntohs(tcp->th_dport);
+	
+	printf("   TCP Packet type: ");
+	int index;
+	if(tcp->th_flags == get_syn_scan_flags()){
+		index = INDEX_SYN;
+		actual_node->tcp_syn++;
+		printf("SYN\n");
+	} else if(tcp->th_flags == get_ack_scan_flags()){
+		index = INDEX_ACK;
+		actual_node->tcp_ack++;
+		printf("ACK\n");
+	} else if(tcp->th_flags == get_null_scan_flags()){
+		index = INDEX_NULL;
+		actual_node->tcp_null++;
+		printf("NULL\n");
+	} else if(tcp->th_flags == get_xmas_scan_flags()){
+		index = INDEX_XMAS;
+		actual_node->tcp_xmas++;
+		printf("XMAS\n");
+	} else if(tcp->th_flags == get_fin_scan_flags()){
+		index = INDEX_FIN;
+		actual_node->tcp_fin++;
+		printf("FIN\n");
+	} else if(tcp->th_flags == get_maimon_scan_flags()){
+		index = INDEX_MAIMON;
+		actual_node->tcp_maimon++;
+		printf("MAIMON (FIN | ACK)\n");
+	}
+	else {
+		index = INDEX_UNKNOWN;
+		printf("Not known scan type (Flag set to 0x%X := ", tcp->th_flags);
+		print_tcp_flags(tcp->th_flags);
+		printf(")\n");
+		actual_node->tcp_unknown++;
+	}
+	
+	
+	
+	
+	printf("   Src port: %d\n", ntohs(tcp->th_sport));
+	printf("   Dst port: %d\n", dst_port);
+	
+	
+	
+	
+	if(_get_all_info){
+		if(actual_node->tcp_port_list == NULL){
+			actual_node->tcp_port_list = new_my_port(dst_port);
+		} else {
+			my_port * actual_port = contains_my_port(actual_node->tcp_port_list, dst_port);
+			if(actual_port == NULL){
+				push_my_port(&actual_node->tcp_port_list, dst_port);	
+			} else {
+				actual_port->times++;
+			}
+		
+		}	
+	}	
+
+	
+	/* ADDING THE SCORE ACCORDINGLY TO 	https://www.sophos.com/it-it/support/knowledgebase/115153.aspx */
+	int tmp = get_score(dst_port);
+	actual_node->tcp_actual_score[INDEX_TCP] += tmp;
+	actual_node->tcp_total_score[INDEX_TCP] += tmp;
+	actual_node->tcp_actual_score[index] += tmp;
+	actual_node->tcp_total_score[index] += tmp;
+
+	/* compute tcp payload (segment) size */
+	size_payload = ntohs(ip->ip_len) - (size_ip + size_tcp);
+	printf("   Payload (%d bytes):\n", size_payload);
+}
+
+
 
 /*
  * dissect/print packet
@@ -104,18 +231,15 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 	/* declare pointers to packet headers */
 	
 	const struct sniff_ip *ip;              /* The IP header */
-	const struct sniff_tcp *tcp;            /* The TCP header */
+	
 	
 	/* Variables */
 	char * tmp, * actual_adress;
 	node_t * actual_node;
 	
-	int size_ip;
-	int size_tcp;
-	int dst_port;
-	int size_payload;
-	printf("\nPacket number %d:\n", count++);
 	
+	printf("\nPacket number %d:\n", count++);
+	int size_ip;
 	
 	
 	/* define/compute ip header offset */
@@ -173,9 +297,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 		case IPPROTO_TCP:
 			actual_node->tcp++;
 			printf("   Protocol: TCP\n");
+			process_tcp(packet, ip, size_ip, actual_node);
 			break;
 		case IPPROTO_UDP:
 			actual_node->udp++;
+			process_udp(packet, ip, size_ip, actual_node);
+
 			printf("   Protocol: UDP\n");
 			return;
 		case IPPROTO_ICMP:
@@ -192,89 +319,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 			return;
 	}
 	
-	/*
-	 *  The packet is securely tcp!
-	 */
 	
-	/* define/compute tcp header offset */
-	tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-	size_tcp = TH_OFF(tcp)*4;
-	if (size_tcp < 20) {
-		printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
-		return;
-	}
-	dst_port = ntohs(tcp->th_dport);
-	
-	printf("   TCP Scan type: ");
-	
-	if(tcp->th_flags == get_syn_scan_flags()){
-		actual_node->tcp_syn_scan++;
-		printf("SYN\n");
-	} else if(tcp->th_flags == get_ack_scan_flags()){
-		actual_node->tcp_ack_scan++;
-		printf("ACK\n");
-	} else if(tcp->th_flags == get_null_scan_flags()){
-		actual_node->tcp_null_scan++;
-		printf("NULL\n");
-	} else if(tcp->th_flags == get_xmas_scan_flags()){
-		actual_node->tcp_xmas_scan++;
-		printf("XMAS\n");
-	} else if(tcp->th_flags == get_fin_scan_flags()){
-		actual_node->tcp_fin_scan++;
-		printf("FIN\n");
-	}
-	else {
-		printf("Not known scan type (Flag set to 0x%X := ", tcp->th_flags);
-		print_tcp_flags(tcp->th_flags);
-		printf(")\n");
-		actual_node->tcp_unknown_scan++;
-	}
-	
-	
-	
-	
-	printf("   Src port: %d\n", ntohs(tcp->th_sport));
-	printf("   Dst port: %d\n", dst_port);
-	
-	
-	
-	
-	if(_get_all_info){
-		if(actual_node->tcp_port_list == NULL){
-			actual_node->tcp_port_list = new_my_port(dst_port);
-		} else {
-			my_port * actual_port = contains_my_port(actual_node->tcp_port_list, dst_port);
-			if(actual_port == NULL){
-				push_my_port(&actual_node->tcp_port_list, dst_port);	
-			} else {
-				actual_port->times++;
-			}
-		
-		}	
-	}	
-
-	
-	/* ADDING THE SCORE ACCORDINGLY TO 	https://www.sophos.com/it-it/support/knowledgebase/115153.aspx */
-	if(dst_port <= 0)
-		fprintf(stderr, "ERROR PORT NEGATIVE\n");
-	else if(dst_port > 65536)
-		fprintf(stderr, "ERROR PORT TOO BIG\n");
-	else if(dst_port == 11 || dst_port == 12 || dst_port == 13 || dst_port == 2000){
-		actual_node->actual_score += 10;
-		actual_node->total_score += 10;
-	}
-	else if(dst_port < 1024){
-		actual_node->actual_score += 3;
-		actual_node->total_score += 3;
-	}
-	else if(dst_port >= 1024){
-		actual_node->actual_score += 1;
-		actual_node->total_score += 1;
-	}
-	
-	/* compute tcp payload (segment) size */
-	size_payload = ntohs(ip->ip_len) - (size_ip + size_tcp);
-	printf("   Payload (%d bytes):\n", size_payload);
 	return;
 }
 
@@ -297,7 +342,7 @@ int main(int argc, char * argv[]){
 	/* Variable declaration */
 	char * dev = NULL;										/* capture device name */
 	char errbuf[PCAP_ERRBUF_SIZE];					/* error buffer */
-	//char filter_exp[] = "dst host 192.168.1.3"; 	/* filter expression */
+	
 	struct bpf_program fp;							/* compiled filter program (expression) */
 	bpf_u_int32 mask;								/* subnet mask */
 	bpf_u_int32 net;								/* ip */
@@ -315,7 +360,6 @@ int main(int argc, char * argv[]){
 		dev = strdup("lo");
 	}
 	else {
-//	getOptions(argc, argv, &dev, &num_packets, &dst_ip, &verbose);
 	/* Not given as parameter */
 	if(dev == NULL) {
 		dev = calloc(64, sizeof(char));
@@ -430,6 +474,8 @@ int main(int argc, char * argv[]){
 	pcap_freecode(&fp);
 	pcap_close(handle);
 	free(dev);
+	free(dst_ip);
+	free(output_file_name);				
 	free(filter_expression);
 	printf("\nCapture complete.\n");
 	return EXIT_SUCCESS;

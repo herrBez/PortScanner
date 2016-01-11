@@ -20,6 +20,10 @@ u_char get_null_scan_flags(){
 	return 0x0;
 }
 
+u_char get_maimon_scan_flags(){
+	return TH_FIN | TH_ACK;
+}
+
 void print_tcp_flags(u_char flag){
 	if((flag & 0x1) == 0x1)
 		printf("FIN ");

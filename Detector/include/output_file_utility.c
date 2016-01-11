@@ -1,6 +1,4 @@
-#include "output_file_utility.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "important_header.h"
 
 
 void fprint_tabs(FILE * fd, int tabs){
@@ -22,10 +20,13 @@ void output_file_f(char * output_file_name, node_t * head, time_t begin_time, ti
 		fprintf(output, "\\usepackage{fullpage}\n");
 		fprintf(output, "\\author{Simon Targa \\and Mirko Bez}\n");
 		fprintf(output, "\\title{Port Scan Detector Output File}\n");
+		fprintf(output, "\\usepackage{hyperref}");
 		fprintf(output, "%% filename: %s\n", output_file_name); 
 		fprintf(output, "\\begin{document}\n");
 		fprintf(output, "\\maketitle{}\n");
 		
+		fprintf(output, "\\tableofcontents\n");
+		fprintf(output, "\\newpage\n");
 		
 		int tabs = 0;
 		fprintf(output, "\\section{List of potential attackers}\n");
@@ -62,11 +63,10 @@ void output_file_f(char * output_file_name, node_t * head, time_t begin_time, ti
 		
 		fprintf(output, "\\section{TCP Details}\n");
 		fprintf(output, "\\emph{SYN, FIN, XMAS, NULL, ACK, UK (Unkown) indicate the number of the tcp packets of that type received.} \\\\ \\\\ \n");
-
-		fprintf(output, "\\begin{tabular}{| c | c | c | c | c | c | c | c | c | c | }\n");
+		fprintf(output, "\\begin{tabular}{| c | c | c | c | c | c | c | c | c | c | c | }\n");
 		fprintf(output, "\\hline \n");
-		fprintf(output, "ID & IP-Address & TCP & SCAN & SYN  & FIN & XMAS & NULL & ACK & UK \\\\ \n");
-		fprintf(output, " &  & & DETECTED &   &  &  &  &  &  \\\\ \n");
+		fprintf(output, "ID & IP & TCP & SCAN & SYN  & FIN & XMAS & NULL & ACK & MAIMON & UK \\\\ \n");
+		fprintf(output, " &  & & DETECTED &   &  &  &  &  & &  \\\\ \n");
 		unsigned int tot_scan_detected = 0;
 		unsigned int diff_sources = 0;
 		fprintf(output, "\\hline \n");
@@ -75,12 +75,12 @@ void output_file_f(char * output_file_name, node_t * head, time_t begin_time, ti
 		while (current != NULL) {
 			src++;
 			fprint_tabs(output, tabs);
-			tot_scan_detected += current->scan_detected;
-			if(current->scan_detected != 0)
+			tot_scan_detected += current->tcp_scan_detected[INDEX_TCP];
+			if(current->tcp_scan_detected[INDEX_TCP] != 0)
 				diff_sources++;
-			fprintf(output, "%d & %s & %3u & %3u & %3u & %3u & %3u & %3u & %3u & %3u \\\\ \n",
-				src, current->ip_src, current->tcp, current->scan_detected, current->tcp_syn_scan, current->tcp_fin_scan,
-				current->tcp_xmas_scan, current->tcp_null_scan, current->tcp_ack_scan, current->tcp_unknown_scan);
+			fprintf(output, "%d & %s & %3u & %3u & %3u & %3u & %3u & %3u & %3u & %3u & %3u\\\\ \n",
+				src, current->ip_src, current->tcp, current->tcp_scan_detected[INDEX_TCP], current->tcp_syn, current->tcp_fin,
+				current->tcp_xmas, current->tcp_null, current->tcp_ack, current->tcp_maimon, current->tcp_unknown);
 			
 			
 			fprint_tabs(output, tabs);
@@ -88,7 +88,51 @@ void output_file_f(char * output_file_name, node_t * head, time_t begin_time, ti
 			current = current->next;
 		}
 		fprintf(output, "\\end{tabular}\n");
-
+		
+		
+		fprintf(output, "\\subsection{Type of TCP SCAN DETECTED}\n");
+		fprintf(output, "\\begin{tabular}{| c | c | c |}\n");
+		fprintf(output, "\\hline \n");
+		fprintf(output, "IP-Address & Type & Times \\\\ \n");
+		fprintf(output, "\\hline \n");
+		current = head;
+		
+		while (current != NULL) {
+			int i;
+			for(i = 0; i <= INDEX_TCP; i++){
+				if(i == 0)
+					fprintf(output, "%s", current->ip_src);
+				fprintf(output, "& %s & %u \\\\ ", index_to_string(i), current->tcp_scan_detected[i]);
+			}
+			
+			current = current->next;
+		}
+		
+		fprintf(output, "\n \\hline\n");
+		
+		fprintf(output, "\\end{tabular}\n");
+		
+		
+		/*****************
+		 *  SECTION UDP 
+		 *****************/
+		fprintf(output, "\\section{UDP Details}\n");
+		fprintf(output, "\\begin{tabular}{| c | c | c | c |}\n");
+		fprintf(output, "\\hline \n");
+		fprintf(output, "ID & IP-Address & SCAN     & TOTAL \\\\ \n");
+		fprintf(output, "   &            & DETECTED & SCORE \\\\ \n");
+		fprintf(output, "\\hline\n");
+		current = head;
+		src = 0;
+		while (current != NULL) {
+			src++;
+			fprintf(output, "%d & %s & %u & %u \\\\ ", src, current->ip_src, current->udp_scan_detected, current->udp_total_score);
+			current = current->next;
+		}
+		
+		fprintf(output, "\\hline \n");
+		fprintf(output, "\\end{tabular}\n");
+		
 		fprintf(output, "\\section{Summary}\n");
 		fprintf(output, "\\emph{List containing the result and some meta data} \\\\ \\\\ \n");
 		
@@ -127,6 +171,67 @@ void output_file_f(char * output_file_name, node_t * head, time_t begin_time, ti
 				
 				fprintf(output, "%d & %s & %d", src, current->ip_src, current->tcp);
 				my_port * my_p = current->tcp_port_list;
+				int line = 0;
+				if(my_p == NULL){
+					fprintf(output, " & & \\\\ \n");
+					total_line++;
+				}
+				while(my_p != NULL){
+					if(line == 0){
+						fprintf(output, " & %d & %d \\\\ \n", my_p->port, my_p->times);
+						line++;
+						total_line++;
+					}
+					else {
+						fprintf(output, "& & & %d & %d \\\\ ", my_p->port, my_p->times);
+						total_line++;
+					}
+					if(total_line % 40 == 0 && total_line != 0){
+						fprintf(output, "\\hline\\end{tabular}\\end{minipage} \\hfill\\begin{minipage}[b]{0.5\\linewidth}");
+						fprintf(output, "\\begin{tabular}{| c | c | c | c | c |}\n");
+						fprintf(output, "\\hline\n");
+						fprintf(output, "ID & IP & TOT & PORT & TIMES \\\\ \n");
+						fprintf(output, "   &    & TCP &      &       \\\\ \n");
+						fprintf(output, "\\hline\n");
+					}
+					
+					my_p = my_p->next;
+				}
+				if(total_line % 40 == 0 && total_line != 0){
+						fprintf(output, "\\hline\\end{tabular}\\end{minipage} \\hfill\\begin{minipage}[b]{0.5\\linewidth}");
+						fprintf(output, "\\begin{tabular}{| c | c | c | c | c |}\n");
+						fprintf(output, "\\hline\n");
+						fprintf(output, "ID & IP & TOT & PORT & TIMES \\\\ \n");
+						fprintf(output, "   &    & TCP &      &       \\\\ \n");
+						fprintf(output, "\\hline\n");
+					}
+				
+				current = current->next;
+			}
+			fprintf(output, "\\hline\n");
+			fprintf(output, "\\end{tabular}\n");
+			fprintf(output, "\\end{minipage}\\hfill");
+		}
+		
+		if(_get_all_info){
+			int total_line = 0;
+			fprintf(output, "\\newpage");
+			fprintf(output, "\\section{UDP PORT FREQUENCY}\n");
+			fprintf(output, "\\emph{List of the tcp port visited from the single host and the times} \\\\ \\\\ \n");
+			
+			fprintf(output, "\\noindent\\begin{minipage}[b]{0.5\\linewidth}");
+			fprintf(output, "\\begin{tabular}{| c | c | c | c | c |}\n");
+			fprintf(output, "\\hline\n");
+			fprintf(output, "ID & IP & TOT & PORT & TIMES \\\\ \n");
+			fprintf(output, "   &    & UDP &      &       \\\\ \n");
+			fprintf(output, "\\hline\n");
+			current = head;
+			src = 0;
+			while(current != NULL){
+				src++;
+				
+				fprintf(output, "%d & %s & %d", src, current->ip_src, current->udp);
+				my_port * my_p = current->udp_port_list;
 				int line = 0;
 				if(my_p == NULL){
 					fprintf(output, " & & \\\\ \n");

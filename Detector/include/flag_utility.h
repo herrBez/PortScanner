@@ -7,6 +7,8 @@ u_char get_fin_scan_flags();
 u_char get_xmas_scan_flags();
 u_char get_ack_scan_flags();
 u_char get_null_scan_flags();
+u_char get_maimon_scan_flags();
+
 void print_tcp_flags(u_char flag);
 
 #endif
