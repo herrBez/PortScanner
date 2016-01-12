@@ -64,7 +64,7 @@ void my_get_options(int argc, char * argv[], char **dev, int * num_packets, char
 			case 'm': *num_packets = (int) strtol(optarg, NULL, 0); 
 				break;
 			case 'i': 
-					*dst_ip = strdup(optarg); printf("DST IP %s\n", *dst_ip);  
+					*dst_ip = strdup(optarg); 
 					break;
 			case 'v': 
 					*verbose = true;
