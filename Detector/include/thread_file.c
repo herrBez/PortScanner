@@ -8,7 +8,7 @@ struct timespec _my_time;
 void controlScore(node_t * n){
 	int i;
 	int tot_detected = 0;
-	for(i = 0; i <= INDEX_TCP; i++){
+	for(i = 0; i < INDEX_SIZE; i++){
 		if(n->tcp_actual_score[i] >= PORT_SCAN_SCORE){
 			printf("*** %7s TCP SCAN FROM %s dectected\n", index_to_string(i), n->ip_src);
 			n->tcp_scan_detected[i]++;
@@ -42,4 +42,3 @@ void * thread_function(void * _node){
 	}
 	return NULL;
 }
-
