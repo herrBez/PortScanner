@@ -107,10 +107,6 @@ void TCPScan(portscanner * p){
 	mysocket = socket(AF_INET, SOCK_STREAM, 0);
 
     memset(&server, 0, sizeof (server));
-	/** N.B. GETHOSTBYNAME IS OBSOLETE */
-	
-	
-	
     hostname = gethostbyname(p->host_name);
 
 
