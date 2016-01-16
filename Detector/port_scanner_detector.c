@@ -392,7 +392,9 @@ int main(int argc, char * argv[]){
 		fprintf(stderr, "Are you connected to the internet?\n");
 		exit(EXIT_FAILURE);
 	}
-
+	
+	//printf("IP  2 %s", inet_ntoa(net));
+	//exit(0);
 	/* compile the filter expression */
 	if (pcap_compile(handle, &fp, filter_expression, 0, net) == -1) {
 		fprintf(stderr, "Couldn't parse filter %s: %s\n",

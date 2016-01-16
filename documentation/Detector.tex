@@ -1,52 +1,85 @@
 \chapter{Port Scan Detection}
 \label{sec:detector}
-The aim of the second part of the project consisted of implementing
+The aim of the second part of the project consisted of understand and implementing
 a port scan detector. Port Scan Detection is fundamental in order
-to detect potential attackers.
+to detect potential attackers or intrusion attempts.
 
 \section{Port Scan Detector}
 There are many approaches to detect port scanning, but the main idea
 is always the same: One target is potentially port scanned if it receives
 from the same source a lot of packets in a short time range.
-This is the approach used by Openwall~\cite{scanlogd} and
+
+Simple examples of port scan detectors are given by 
+Openwall~\cite{scanlogd} and
 Sophos~\cite{sophos}.
 We chose the second method because it is described in more details and the document found
 is more recent.
 \subsection{Theory}
-According to the description of Sophos their port scan detector works in the following way~\cite{sophos}:
+According to the description of Sophos their port scan detector works as follows~\cite{sophos}:
 \begin{quote}
 	A port scan is detected when a detection score of 21 points
 	in a time range of 300ms for one individual source IP-Address is exceeded.
 \end{quote}
-When a packet from one source is received the Detection Score of this source
+When a packet from one source is received the detection score of this source
 is actualised adding the points accordingly to the following rules:
 \begin{itemize}
-	\item TCP Destination port $<$ 1024: 3 points
-	\item TCP Destination port $>=$ 1024: 1 point
-	\item TCP Destination port 11, 12, 13, 2000: 10 points
+	\item Destination port $<$ 1024: 3 points
+	\item Destination port $>=$ 1024: 1 point
+	\item Destination port 11, 12, 13, 2000: 10 points
 \end{itemize}
 The assignments of the points could seem random, but it can be explained by observing the services running on the different ports and the threats associated to the ports.
 \subsubsection{Score explanation}
 The Internet Engineering Task Force (IETF) distinguish three ranges of ports: System Ports (0-1023), 
 User Ports (1024-49151) and Dynamic and/or Private Ports (49152-65535).
-
 The first range is of particular interest for attackers because it contains many well-known services such as FTP, SSH and HTTP.
-The other ranges are generally of minor interest.
+The other ranges are generally of less interest.
 
 The Ports 11, 12, 13 and 2000 are of particular interest because they are associated with different attacks or can be used
-to gather information about a victim.
-
-According to IANA the port 11 is assigned to the service Active Users. If this service
-receives an UDP or TCP packet it replies with the list of the active users independently from the content of the packet~\cite{systat}.
-
-Port 13 is assigned to the daytime service. If this service receives a TCP or UDP packet it responds with the actual time of day without considering
+to gather information about the victim.
+According to IANA~\cite{IANAPORTS} the port 11 is assigned to the service Active Users. If this service is running and
+receives an UDP or TCP packet it replies with the list of the active users (i.e. the logged users) independently from the content of the packet~\cite{systat}.
+Port 13 is assigned to the daytime service. If this service is running and receives a TCP or UDP packet it responds with the actual time of day without considering
 the content of the received packet. Different machines responds with different date/time format, so this can be used to fingerprint the machines~\cite{portDetails}.
+Port 2000 is officially assigned to the CISCO SCCP service, but it is also famous for 
+many Trojans such as Der Spaehr, Remote Explorer 2000 \dots ~\cite{portDetails}.
+Port 12 is not associated to any service and attacks but it's importance is probably due to the fact that it is between port 11 and 13.
 
-Port 2000 is officially assigned to the CISCO SCCP service, but it is also well known for 
-many Trojans such as Der Spaehr, Remote Explorer 2000 \dots~\cite{portDetails}.
+\subsection{Details of implementation}
+The implementation of the Port Scan Detector is largely based on the use of the pcap library~\cite{pcaptcpdump}.
+This library is used by tcpdump and wireshark in order to get  the packets on the network and choose 
+which packets to sniff and which to ignore by using filter expression such as among others \lstinline!dst host 192.168.0.1! and \lstinline!dst portrange 1-1024!
+or a combination of those rules~\cite{pcapFilterRules}.
+In order to start a capture session the program has to create a new pcap object using the \lstinline!pcap_open_live! function:
+\begin{lstlisting}[frame= single, language=C, caption={Create a new pcap handler.}, label=lst:open_live]
+handle = pcap_open_live(dev, SNAP_LEN, 0, 1000, errbuf);
+\end{lstlisting}
+\todo{Argument Explanation?}
+%The first argument is the interface (e.g. wlan0), the second argument indicate the maximal bytes per packet to capture, 0 stay for the modus  non-promiscuous
+%(Get only the packets directed to the machine) and 1000 stays for the read time-out in ms, the last argument is a buffer that in case of failure contains
+%the error message.
+Another important step is to compile the filter expression. To do that we need also the net 
+\begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to start getting the packets on the network (Error handling omitted).]
+pcap_lookupnet(dev, &ip, &mask, errbuf);
+pcap_compile(handle, &fp, filter_expression, 0, net);
+\end{lstlisting}
 
-Port 12 is not associated to any service and attacks but is maybe important because it's between port 11 and 13.
+
+\begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to start getting the packets on the network (Error handling omitted).]
+pcap_lookupnet(dev, &net, &mask, errbuf);
+pcap_t* handle = pcap_open_live(dev, SNAP_LEN, NON_PROMISCUOUS, 1000, errbuf);
+pcap_datalink(handle) != DLT_EN10MB);
+pcap_compile(handle, &fp, filter_expression, 0, net);
+pcap_setfilter(handle, &fp);
+pcap_loop(handle, num_packets, got_packet, NULL);
+\end{lstlisting}
 
 
 
-\subsection{Details of implementation} 
+
+
+
+
+
+
+
+
