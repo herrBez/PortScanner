@@ -1,19 +1,19 @@
 \chapter{Port Scan Detection}
 \label{sec:detector}
-The aim of the second part of the project consisted of understand and implementing
-a port scan detector. Port Scan Detection is fundamental in order
-to detect potential attackers or intrusion attempts.
+Port Scan Detection is fundamental in order
+to identify potential attackers or to recognize intrusion attempts.
 
-\section{Port Scan Detector}
-There are many approaches to detect port scanning, but the main idea
+There are many approaches to detect port scans, but the main idea
 is always the same: One target is potentially port scanned if it receives
 from the same source a lot of packets in a short time range.
-
 Simple examples of port scan detectors are given by 
-Openwall~\cite{scanlogd} and
-Sophos~\cite{sophos}.
+Openwall~\cite{scanlogd} and Sophos~\cite{sophos}.
 We chose the second method because it is described in more details and the document found
 is more recent.
+
+\section{Port Scan Detector}
+
+
 \subsection{Theory}
 According to the description of Sophos their port scan detector works as follows~\cite{sophos}:
 \begin{quote}
@@ -30,7 +30,7 @@ is actualised adding the points accordingly to the following rules:
 The assignments of the points could seem random, but it can be explained by observing the services running on the different ports and the threats associated to the ports.
 \subsubsection{Score explanation}
 The Internet Engineering Task Force (IETF) distinguish three ranges of ports: System Ports (0-1023), 
-User Ports (1024-49151) and Dynamic and/or Private Ports (49152-65535).
+User Ports (1024-49151) and Dynamic and/or Private Ports (49152-65535)~\cite{rfc6335}.
 The first range is of particular interest for attackers because it contains many well-known services such as FTP, SSH and HTTP.
 The other ranges are generally of less interest.
 
@@ -41,35 +41,34 @@ receives an UDP or TCP packet it replies with the list of the active users (i.e.
 Port 13 is assigned to the daytime service. If this service is running and receives a TCP or UDP packet it responds with the actual time of day without considering
 the content of the received packet. Different machines responds with different date/time format, so this can be used to fingerprint the machines~\cite{portDetails}.
 Port 2000 is officially assigned to the CISCO SCCP service, but it is also famous for 
-many Trojans such as Der Spaehr, Remote Explorer 2000 \dots ~\cite{portDetails}.
-Port 12 is not associated to any service and attacks but it's importance is probably due to the fact that it is between port 11 and 13.
+many Trojans such as Der Spaehr, Remote Explorer 2000 among others~\cite{portDetails}.
+Port 12 is not associated to any service and attacks but its importance is probably due to the fact that it resides between port 11 and 13.
 
 \subsection{Details of implementation}
-The implementation of the Port Scan Detector is largely based on the use of the pcap library~\cite{pcaptcpdump}.
+The implementation of the Port Scan Detector is largely based on the use of the tcpdump's pcap library
+and on a good example given by tcpdump self~\cite{pcaptcpdump}.
 This library is used by tcpdump and wireshark in order to get  the packets on the network and choose 
-which packets to sniff and which to ignore by using filter expression such as among others \lstinline!dst host 192.168.0.1! and \lstinline!dst portrange 1-1024!
+which packets to sniff and which to ignore by using filter expression such as \lstinline!dst host 192.168.0.1! and \lstinline!dst portrange 1-1024!
 or a combination of those rules~\cite{pcapFilterRules}.
+
+
+
 In order to start a capture session the program has to create a new pcap object using the \lstinline!pcap_open_live! function:
 \begin{lstlisting}[frame= single, language=C, caption={Create a new pcap handler.}, label=lst:open_live]
 handle = pcap_open_live(dev, SNAP_LEN, 0, 1000, errbuf);
 \end{lstlisting}
-\todo{Argument Explanation?}
-%The first argument is the interface (e.g. wlan0), the second argument indicate the maximal bytes per packet to capture, 0 stay for the modus  non-promiscuous
-%(Get only the packets directed to the machine) and 1000 stays for the read time-out in ms, the last argument is a buffer that in case of failure contains
-%the error message.
-Another important step is to compile the filter expression. To do that we need also the net 
-\begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to start getting the packets on the network (Error handling omitted).]
-pcap_lookupnet(dev, &ip, &mask, errbuf);
-pcap_compile(handle, &fp, filter_expression, 0, net);
-\end{lstlisting}
-
-
-\begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to start getting the packets on the network (Error handling omitted).]
-pcap_lookupnet(dev, &net, &mask, errbuf);
-pcap_t* handle = pcap_open_live(dev, SNAP_LEN, NON_PROMISCUOUS, 1000, errbuf);
-pcap_datalink(handle) != DLT_EN10MB);
+Another important step is to compile the filter expression. 
+\begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to compile the filter expression and to set it.]
 pcap_compile(handle, &fp, filter_expression, 0, net);
 pcap_setfilter(handle, &fp);
+\end{lstlisting}
+
+A fundamental function is the \lstinline|pcap_loop|. The parameters are the pcap object,
+the num of packets (-1 for infinity) a callback function that is called each time a packet
+is got and the last is usually set as NULL, but it can be used to pass extra arguments for the
+callback function.
+
+\begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to start getting the packets on the network (Error handling omitted).]
 pcap_loop(handle, num_packets, got_packet, NULL);
 \end{lstlisting}
 
