@@ -11,6 +11,10 @@ Openwall~\cite{scanlogd} and Sophos~\cite{sophos}.
 We chose the second method because it is described in more details and the document found
 is more recent.
 
+
+
+\section{Demo Description}
+
 \section{Port Scan Detector}
 
 
@@ -43,6 +47,9 @@ the content of the received packet. Different machines responds with different d
 Port 2000 is officially assigned to the CISCO SCCP service, but it is also famous for 
 many Trojans such as Der Spaehr, Remote Explorer 2000 among others~\cite{portDetails}.
 Port 12 is not associated to any service and attacks but its importance is probably due to the fact that it resides between port 11 and 13.
+
+
+
 
 \subsection{Details of implementation}
 The implementation of the Port Scan Detector is largely based on the use of the tcpdump's pcap library
