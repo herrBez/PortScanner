@@ -244,10 +244,10 @@ int receive_packet(int s, int port, int method)
 			}
 		}
 		else{
-			if(method !=0){
+			if(method != 0){
 				printf("Port: %d is open\n", port);
 			}
-			if(method ==0){
+			if(method == 0){
 				printf("Received timeout, port %d could be filtered by firewall\n", port);
 			}
 			return 0;

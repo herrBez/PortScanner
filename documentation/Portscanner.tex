@@ -1,9 +1,10 @@
 \documentclass[a4paper]{scrreprt}
-\RequirePackage[a4paper,left=2cm,right=2cm,top=2cm,bottom=3cm]{geometry}
+%\RequirePackage[a4paper,left=2.5cm,right=2.5cm,top=2.5cm,bottom=3cm]{geometry}
 \usepackage[utf8]{inputenc}
 \usepackage{hyperref}
 \hypersetup{colorlinks = true, pdfborderstyle = {/S/U/W 1}, linkcolor = black}
-\usepackage{tabularx}
+
+%\usepackage{tabularx}
 %\usepackage{todonotes}
 \usepackage{listings}
 \lstset{ 
@@ -13,7 +14,7 @@
 }
 %\usepackage[backend=bibtex]{biblatex}
 %\usepackage{fullpage}
-\bibliography{Portscanner}
+%\bibliography{Portscanner}
 
 	
 \begin{document}
@@ -28,7 +29,7 @@
 
 
 
-\section*{Introduction}
+\chapter*{Introduction}
 The first goal of the project was to understand the theory behind port scanners and their detection. The next goal was to implement a port scanner. The scanner should be written in C and support various scan methods (e.g.\ TCP connect scan, TCP SYN scan \dots). The last goal
 was to implement our own port scan detector. 
 
@@ -49,10 +50,40 @@ attackers to identify services running on a host and exploit vulnerabilities.
 
 For example, researchers recently identified bugs in Oracle’s Java SE that allow arbitrary execution of code, access to security sensitive data, unauthorized changes in security configurations, and so on~\cite{dangerports}.
 
+
+
 \input{Scanner}
 
 \input{Detector}
 
+
+\chapter{Future Work}
+There is room of improvement in our project. Section~\ref{sec:improve:scan} gives some advice how the port scanner may be improved and section~\ref{sec:improve:detector} suggests some 
+possible improvements for the port scan detector. 
+\section{Port scanner}
+\label{sec:improve:scan}
+\begin{itemize}
+\item Currently in our port scanner we have set a timeout to wait one second for a response. This value could be increased/decreased by
+doing some tests on different machines and servers to determine a stable value for the timeout.
+\item Our port scanner loops over every port to scan and only tries once to send a request to the server. If a server is unstable this behavior could
+led to inconsistent results. It may be better to choose a number of repetition to send the request after getting the timeout.
+\item Multithreading could be used to scan different ports simultaneously. 
+\item Other scan methods could be added the port scanner (e.g. Idle Scan, UDP scan).
+\end{itemize}
+\section{Port scan Detector}
+\label{sec:improve:detector}
+\begin{itemize}
+\item The port scan detector currently uses only one network interface. It may be also interesting to have an option to use more network interfaces simultaneously.
+\item Currently the detector takes the IP address of the interface as an command line argument. In make it more user-friendly the IP address could be determined at runtime.
+\item In order to distinguish between a TCP connect and SYN scan techniques could be implemented to recognizes a complete handshake.
+\item Implementation of other port scan detection approaches.
+	
+
+\end{itemize}
+
+
+
+\section{Extensions}
 
 
 \newpage
