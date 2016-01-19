@@ -1,143 +1,145 @@
 \chapter{Port Scannner}
+
+\section{Demo Description}
+
+
 \section{TCP connect scan}
 \label{sec:connect}
-	\subsection{Theory}
-	The TCP connect scan is probably the most easy method to scan for open ports. It simply takes advantage of the system call
-	\emph{connect} of the underlying operating system, in order to establish a connection with the target machine and port. Afterwards the
-	returned value of the system call is used to determine if the port to check is either closed or open at the target machine~\cite{nmap2009}.
-	
-	
-	\subsection{Details of implementation}
-	In order to use the system call~\lstinline{connect} the implementation uses C sockets of the type \lstinline|SOCK_STREAM|. This type
-	of socket allows us, to establish a tcp connection to the target machine.
-	\begin{lstlisting}[frame= single, language=C, caption=C code to create a tcp socket in C]
-	int mysocket;
-	mysocket=socket(AF_INET, SOCK_STREAM, 0);
-	\end{lstlisting}
-	Additionally to the socket we also have to use a structure of the type \lstinline|sockaddr_in| to connect to the target machine and port.
-	The structure is needed to define the ip address of the target machine and the port to use for the connection. The listing shows the
-	code of how to assign the ip address and port to a structure of the type \lstinline|sockaddr_in|. 
-	\begin{lstlisting}[frame= single, language=C, caption= C code to use the structure \lstinline|sockaddr_in|]
-	struct sockaddr_in server;
-	struct hostent *host;
-	hostname = gethostbyname(p->host_name);
-	memcpy( (char *)&server.sin_addr, host->h_addr_list[0], host->h_length);
-	server.sin_family = AF_INET;
-	server.sin_port = htons(port);
-	\end{lstlisting}
-	The last step is to use the created socket and  \lstinline|sockaddr_in| structure to connect to the target machine and port. If the 
-	connection could be established we know that the port is open. To check if the connection attempt was successful, we only have to
-	check the return value of the connect() function. Upon successful completion, connect() shall return 0. The code to use the connect() function is shown in the listing.
-	\begin{lstlisting}[frame= single, language=C, caption= C code to use the connect() to check if port is open]
-	if(connect(mysocket, (struct sockaddr *)&server, sizeof(server))>=0){
-		printf("TCP - Port %d is open\n", i);
-		close(mysocket);
-		mysocket = socket(AF_INET, SOCK_STREAM, 0);
-	}
-	\end{lstlisting}
-	
-	\section{TCP SYN scan}
-	\label{sec:syn}
-	\subsection{Theory}
-	
-	
-	
-	\subsection{Details of implementation}
-	In order to only send a syn request instead of open a full tcp connection (including handshake) the implementation uses raw sockets. Raw sockets allow to control
-	every section of the packets that will be sent. The function socket(), as shown in listing, can be used to create a raw socket that uses the tcp protocol.
-	\begin{lstlisting}[frame= single, language=C, caption= C code to use the connect() to check if port is open]
-		int mysocket;
-		mysocket=socket(AF_INET, SOCK_RAW,  IPPROTO_TCP);
-	\end{lstlisting}
-	Before we can send a syn request to the target machine, we have to build the packet to be sent. To send packets with a raw socket the function sendto() is used.
-	It's second parameter is a pointer to the message to be sent, which 
-	is the packet that we build. It consists of the tcp theader, the ip header and the data
-	to be sent. As we only want to send a syn request we don't care about the data, therefore it is empty. We start building the packet by filling in the IP-Header. We don't need optional fields therefore the we use the minimal size possible size of the ip header which is 160 Bits (5*32 Bits). We use the ip version 4, which is still the most widely used ip version. The length of our packet
-	is the sum of the length of the ip header and the length of the tcp header. For the time to live we choose 64, which should be big enough
-	fur our purpose. As transfer protocol we set the tcp protocol. The source address of the ip header is set to the ip address of the scanning system and the destination address is set to the address of the target system to scan. To have a complete ip header we also
-	have to calculate its check sum.
-	\begin{lstlisting}[frame= single, language=C, caption= C code to fill in ip header]
-	//Fill in the IP Header
-	iph->ihl = 5;
-	iph->version = 4;
-	iph->tos = 0;
-	iph->tot_len = sizeof (struct ip) + sizeof (struct tcphdr);
-	iph->id = htons (54321); //Id of this packet
-	iph->frag_off = htons(16384);
-	iph->ttl = 64;
-	iph->protocol = IPPROTO_TCP;
-	iph->saddr = inet_addr ( source_ip );   
-	iph->daddr = dest_ip.s_addr;
-	iph->check = csum(datagram, iph->tot_len>>1);
-	\end{lstlisting}
-	Before the packet can be sent, we also need to fill in the tcp header. In order to send a syn request we only set the syn flag to true and all the other flags to false.
-	\begin{lstlisting}[frame= single, language=C, caption= C code to set flags in tcp header]
-	tcph->fin=0;
-	tcph->syn=1;
-	tcph->rst=0;
-	tcph->psh=0;
-	tcph->ack=0;
-	tcph->urg=0;
-	\end{lstlisting}
-	The last step before we can send the packet is to set the destination port (the port to scan)  in the tcp header and calculate its check sum.
-	\begin{lstlisting}[frame= single, language=C, caption= C code to set port and calculate checksum in tcp header]
-	tcph->dest = htons ( port );
-	tcph->check = csum(&psh, sizeof(struct pseudo_header))
-	\end{lstlisting}
-	The function sendto() is used to send the created packet to the target machine and port. If the sending fails the program terminates with
-	an error, because then we cannot scan for open ports.
-	\begin{lstlisting}[frame= single, language=C, caption= C code to set port and calculate checksum in tcp header]
-	if(sendto(s, datagram, packetsize, 0 , &dest, destsize)< 0)
-	{
-	perror("Error sending packet: ");
-	exit(0);
-	}
-	\end{lstlisting}
-	To complete the syn port scan, we also have to receive the answer to our sent packet. To receive packets with from a raw socket the function recvfrom() is used. The function call blocks, until it
-	receives a packet from the given socket. Therefore we used the function select, to add an timer to the receiving socket. As you can see in the code of the following listing, we add an timer of 1 sec
-	to the receiving socket and only use the recvfrom() function if the socket contains a packet. If we cannot receive an answer then we simply scan the next port in our implementation.
-	\begin{lstlisting}[frame= single, language=C, caption= C code to receive the packet]
- FD_ZERO(&fds);
- FD_SET(s, &fds);
- tv.tv_sec = 1;
- tv.tv_usec = 0;
- select(s+ 1, &fds, NULL, NULL, &tv);		
- if (FD_ISSET(s, &fds))
- {
- data_size = recvfrom(s, buffer, 65536, 0, &saddr, &saddr_size);
-	................................
- }else{
-  printf("Timeout, port %d filtered by firewall", port);
-  return 0;
- }
-	\end{lstlisting}
-	Because it could be the case that we receive packets from other requests, we first have to check, if the received packet
-	is an answer to our request. To do so we use the IF-Statement of the Listing~\ref{lst:checkorigin}. It checks if the source port of the received packet equals the destination port of our sent packet and
-	if the source ip equals to the destination ip to which we sent the packet.
-	\begin{lstlisting}[frame= single, language=C, caption= IF statement to check origin of packet, label=lst:checkorigin]
-	if(source.sin_addr.s_addr == dest_ip.s_addr &&
-	port == ntohs(tcph->source))
-	\end{lstlisting}
-	If the received packet passes the check, we know that we have the packet we were looking for. To test if the port is open we finally only have to check if the ack and syn flags are set in the tcp header
-	of the answer. To do so, we first extract the tcp header from our answer by using the length of the ip header as an offset. This works because the first bytes of our answer contain the ip header, which
-	is followed by the tcp header. As it can be seen in the listing~\ref{lst:synack}, we finally use an IF statement to check if the tcp header contains the flags which we desire. If it is the case, we know that the scanned
-	port is open.
-	\begin{lstlisting}[frame= single, language=C, caption=C code to check if answer contains syn and ack flag, label=lst:synack]
-	struct tcphdr *tcph=(struct tcphdr*)(buffer + iphdrlen);
-	
-	if(tcph->syn == 1 && tcph->ack == 1){
-	printf("Port: %d is open\n", port);
-	} 
-	\end{lstlisting}
-	\section{XMAS, TCP NULL and FIN scan}
-		\label{sec:xmas}
-		\subsection{Theory}
-		
-		\subsection{Details of implementation}
-		The implementation of the XMAS, TCP NULL and FIN scan is quiet similar to the implementation of the syn scanner. In fact these four scan methods have very much in common.
-		They all need a raw socket to work. There are only 2 main differences between this scan methods and the syn scan. The first one is that XMAS, NULL and FIN scan set different flags
-		in the tcp header. As the name suggests the NULL scan sets none of the flags and the FIN scan only sets the FIN flag. The XMAS scan sets the FIN, PSH, and URG flags, lighting the packet up like a Christmas tree.
-		The second difference of this three scan methods to the syn method is how the answer to the request is used to determine if a port is open or not. If we get a packet with the RST flag as an answer of one
-		of this three scan methods, we know the port is closed. If we don't get an answer we know that the server must have dropped the packet because of an illegal request (RFC 793).
-		
+\subsection{Theory}
+The TCP connect scan is probably the most easy method to scan for open ports. It simply takes advantage of the system call
+~\lstinline|connect| of the underlying operating system, in order to establish a connection with the target machine and port. Afterwards the
+returned value of the system call is used to determine if the port to check is either closed or open at the target machine~\cite{nmap2009}.
+
+
+\subsection{Details of implementation}
+In order to use the system call~\lstinline{connect} the implementation uses C sockets of the type \lstinline|SOCK_STREAM|. This type
+of socket allows us, to establish a TCP connection to the target machine.
+\begin{lstlisting}[frame= single, language=C, caption=C code to create a TCP socket in C]
+int mysocket=socket(AF_INET, SOCK_STREAM, 0);
+\end{lstlisting}
+Additionally to the socket we also have to use a structure of the type \lstinline|sockaddr_in| to connect to the target machine and port.
+The structure is needed to define the ip address of the target machine and the port to use for the connection. The listing shows the
+code of how to assign the ip address and port to a structure of the type \lstinline|sockaddr_in|. 
+\begin{lstlisting}[frame= single, language=C, caption= C code to use the structure \lstinline|sockaddr_in|]
+struct sockaddr_in server;
+struct hostent *host;
+hostname = gethostbyname(p->host_name);
+memcpy( (char *)&server.sin_addr, host->h_addr_list[0], host->h_length);
+server.sin_family = AF_INET;
+server.sin_port = htons(port);
+\end{lstlisting}
+The last step is to use the created socket and  \lstinline|sockaddr_in| structure to connect to the target machine and port. If the 
+connection could be established we know that the port is open. To check if the connection attempt was successful, we only have to
+check the return value of the connect() function. Upon successful completion, connect() shall return 0. The code to use the connect() function is shown in the listing.
+\begin{lstlisting}[frame= single, language=C, caption= C code to use the connect() to check if port is open]
+if(connect(mysocket, (struct sockaddr *)&server, sizeof(server))>=0){
+printf("TCP - Port %d is open\n", i);
+close(mysocket);
+mysocket = socket(AF_INET, SOCK_STREAM, 0);
+}
+\end{lstlisting}
+
+\section{TCP SYN scan}
+\label{sec:syn}
+\subsection{Theory}
+
+
+
+\subsection{Details of implementation}
+In order to only send a syn request instead of open a full TCP connection (including handshake) the implementation uses raw sockets. Raw sockets allow to control
+every section of the packets that will be sent. The function socket(), as shown in listing, can be used to create a raw socket that uses the TCP protocol.
+\begin{lstlisting}[frame= single, language=C, caption= C code to use the connect() to check if port is open]
+int mysocket=socket(AF_INET, SOCK_RAW,  IPPROTO_TCP);
+\end{lstlisting}
+Before we can send a syn request to the target machine, we have to build the packet to be sent. To send packets with a raw socket the function sendto() is used.
+It's second parameter is a pointer to the message to be sent, which 
+is the packet that we build. It consists of the TCP theader, the ip header and the data
+to be sent. As we only want to send a syn request we don't care about the data, therefore it is empty. We start building the packet by filling in the IP-Header. We don't need optional fields therefore the we use the minimal size possible size of the ip header which is 160 Bits (5*32 Bits). We use the ip version 4, which is still the most widely used ip version. The length of our packet
+is the sum of the length of the ip header and the length of the TCP header. For the time to live we choose 64, which should be big enough
+fur our purpose. As transfer protocol we set the TCP protocol. The source address of the ip header is set to the ip address of the scanning system and the destination address is set to the address of the target system to scan. To have a complete ip header we also
+have to calculate its check sum.
+\begin{lstlisting}[frame= single, language=C, caption= C code to fill in ip header]
+//Fill in the IP Header
+iph->ihl = 5;
+iph->version = 4;
+iph->tos = 0;
+iph->tot_len = sizeof (struct ip) + sizeof (struct tcphdr);
+iph->id = htons (54321); //Id of this packet
+iph->frag_off = htons(16384);
+iph->ttl = 64;
+iph->protocol = IPPROTO_TCP;
+iph->saddr = inet_addr ( source_ip );   
+iph->daddr = dest_ip.s_addr;
+iph->check = csum(datagram, iph->tot_len>>1);
+\end{lstlisting}
+Before the packet can be sent, we also need to fill in the TCP header. In order to send a syn request we only set the syn flag to true and all the other flags to false.
+\begin{lstlisting}[frame= single, language=C, caption= C code to set flags in TCP header]
+tcph->fin=0;
+tcph->syn=1;
+tcph->rst=0;
+tcph->psh=0;
+tcph->ack=0;
+tcph->urg=0;
+\end{lstlisting}
+The last step before we can send the packet is to set the destination port (the port to scan)  in the TCP header and calculate its check sum.
+\begin{lstlisting}[frame= single, language=C, caption= C code to set port and calculate checksum in TCP header]
+tcph->dest = htons ( port );
+tcph->check = csum(&psh, sizeof(struct pseudo_header))
+\end{lstlisting}
+The function sendto() is used to send the created packet to the target machine and port. If the sending fails the program terminates with
+an error, because then we cannot scan for open ports.
+\begin{lstlisting}[frame= single, language=C, caption= C code to set port and calculate checksum in TCP header]
+if(sendto(s, datagram, packetsize, 0 , &dest, destsize)< 0)
+{
+perror("Error sending packet: ");
+exit(0);
+}
+\end{lstlisting}
+To complete the syn port scan, we also have to receive the answer to our sent packet. To receive packets with from a raw socket the function recvfrom() is used. The function call blocks, until it
+receives a packet from the given socket. Therefore we used the function select, to add an timer to the receiving socket. As you can see in the code of the following listing, we add an timer of 1 sec
+to the receiving socket and only use the recvfrom() function if the socket contains a packet. If we cannot receive an answer then we simply scan the next port in our implementation.
+\begin{lstlisting}[frame= single, language=C, caption= C code to receive the packet]
+FD_ZERO(&fds);
+FD_SET(s, &fds);
+tv.tv_sec = 1;
+tv.tv_usec = 0;
+select(s+ 1, &fds, NULL, NULL, &tv);		
+if (FD_ISSET(s, &fds))
+{
+data_size = recvfrom(s, buffer, 65536, 0, &saddr, &saddr_size);
+................................
+}else{
+printf("Timeout, port %d filtered by firewall", port);
+return 0;
+}
+\end{lstlisting}
+Because it could be the case that we receive packets from other requests, we first have to check, if the received packet
+is an answer to our request. To do so we use the IF-Statement of the Listing~\ref{lst:checkorigin}. It checks if the source port of the received packet equals the destination port of our sent packet and
+if the source ip equals to the destination ip to which we sent the packet.
+\begin{lstlisting}[frame= single, language=C, caption= IF statement to check origin of packet, label=lst:checkorigin]
+if(source.sin_addr.s_addr == dest_ip.s_addr &&
+port == ntohs(tcph->source))
+\end{lstlisting}
+If the received packet passes the check, we know that we have the packet we were looking for. To test if the port is open we finally only have to check if the ack and syn flags are set in the TCP header
+of the answer. To do so, we first extract the TCP header from our answer by using the length of the ip header as an offset. This works because the first bytes of our answer contain the ip header, which
+is followed by the TCP header. As it can be seen in the listing~\ref{lst:synack}, we finally use an IF statement to check if the TCP header contains the flags which we desire. If it is the case, we know that the scanned
+port is open.
+\begin{lstlisting}[frame= single, language=C, caption=C code to check if answer contains syn and ack flag, label=lst:synack]
+struct tcphdr *tcph=(struct tcphdr*)(buffer + iphdrlen);
+
+if(tcph->syn == 1 && tcph->ack == 1){
+printf("Port: %d is open\n", port);
+} 
+\end{lstlisting}
+\section{XMAS, TCP NULL and FIN scan}
+\label{sec:xmas}
+\subsection{Theory}
+
+\subsection{Details of implementation}
+The implementation of the XMAS, TCP NULL and FIN scan is quiet similar to the implementation of the syn scanner. In fact these four scan methods have very much in common.
+They all need a raw socket to work. There are only 2 main differences between this scan methods and the syn scan. The first one is that XMAS, NULL and FIN scan set different flags
+in the TCP header. As the name suggests the NULL scan sets none of the flags and the FIN scan only sets the FIN flag. The XMAS scan sets the FIN, PSH, and URG flags, lighting the packet up like a Christmas tree.
+The second difference of this three scan methods to the syn method is how the answer to the request is used to determine if a port is open or not. If we get a packet with the RST flag as an answer of one
+of this three scan methods, we know the port is closed. If we don't get an answer we know that the server must have dropped the packet because of an illegal request (RFC 793).
+
 		
