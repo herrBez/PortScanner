@@ -4,7 +4,7 @@ Port Scan Detection is fundamental in order
 to identify potential attackers or to recognize intrusion attempts.
 
 There are many approaches to detect port scans, but the main idea
-is always the same: One target is potentially port scanned if it receives
+is always the same: \textit{O}ne target is potentially port scanned if it receives
 from the same source a lot of packets in a short time range.
 Simple examples of port scan detectors are given by 
 Openwall~\cite{scanlogd} and Sophos~\cite{sophos}.
@@ -18,7 +18,7 @@ is more recent.
 According to the description of Sophos their port scan detector works as follows~\cite{sophos}:
 \begin{quote}
 	A port scan is detected when a detection score of 21 points
-	in a time range of 300ms for one individual source IP-Address is exceeded.
+	in a time range of 300ms for one individual source IP address is exceeded.
 \end{quote}
 When a packet from one source is received the detection score of this source
 is actualised adding the points accordingly to the following rules:
