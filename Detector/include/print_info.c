@@ -8,7 +8,7 @@ void printHelp(char * program_name){
 	printf("Usage: %s [options]\n", program_name);
 	printf("Options:\n\n");
 	printf("\t --help\n");
-	printf("\t -h \t print this help and exit\n");
+	printf("\t -h \t print this help page and exit\n");
 	printf("\t --save-the-port\n");
 	printf("\t -s \t save all the tcp ports requested from the potential attackers\n");
 	printf("\t --device\n");
