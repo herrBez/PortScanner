@@ -20,6 +20,7 @@ is more recent.
 
 
 \subsection{Theory}
+\label{subsec:detector:theory}
 According to the description of Sophos their port scan detector works as follows~\cite{sophos}:
 \begin{quote}
 	A port scan is detected when a detection score of 21 points
@@ -33,32 +34,21 @@ is actualised adding the points accordingly to the following rules:
 	\item Destination port 11, 12, 13, 2000: 10 points
 \end{itemize}
 The assignments of the points could seem random, but it can be explained by observing the services running on the different ports and the threats associated to the ports.
+
+
+
 \subsubsection{Score explanation}
 The Internet Engineering Task Force (IETF) distinguish three ranges of ports: System Ports (0-1023), 
 User Ports (1024-49151) and Dynamic and/or Private Ports (49152-65535)~\cite{rfc6335}.
 The first range is of particular interest for attackers because it contains many well-known services such as FTP, SSH and HTTP.
 The other ranges are generally of less interest.
 
+
 The Ports 11, 12, 13 and 2000 are of particular interest because they are associated with different attacks or can be used
 to gather information about the victim.
 According to IANA~\cite{IANAPORTS} the port 11 is assigned to the service Active Users. If this service is running and
-receives an UDP or TCP packet it replies with the list of the active users (i.e. the logged users) independently from th
-A port scan is detected when a detection score of 21 points
-in a time range of 300ms for one individual source IP address is exceeded.
-\end{quote}
-When a packet from one source is received the detection score of this source
-is actualised adding the points accordingly to the following rules:
-\begin{itemize}
-	\item Destination port $<$ 1024: 3 points
-	\item Destination port $>=$ 1024: 1 point
-	\item Destination port 11, 12, 13, 2000: 10 points
-\end{itemize}
-The assignments of the points could seem random, but it can be explained by observing the services running on the different ports and the threats associated to the ports.
-\subsubsection{Score explanation}
-The Internet Engineering Task Force (IETF) distinguish three ranges of ports: System Ports (0-1023), 
-User Ports (1024-49151) and Dynamic and/or Private Ports (49152-65535)~\cite{rfc6335}.
-The first range is of particular interest for attackers because it contains many well-known services such as FTP, SSH and HTTP.
-The other ranges are generally of less interest.e content of the packet~\cite{systat}.
+receives an UDP or TCP packet it replies with the list of the active users (i.e. the logged users) independently from the
+content of the packet received~\cite{systat}.
 Port 13 is assigned to the daytime service. If this service is running and receives a TCP or UDP packet it responds with the actual time of day without considering
 the content of the received packet. Different machines responds with different date/time format, so this can be used to fingerprint the machines~\cite{portDetails}.
 Port 2000 is officially assigned to the CISCO SCCP service, but it is also famous for 
@@ -81,19 +71,194 @@ In order to start a capture session the program has to create a new pcap object 
 \begin{lstlisting}[frame= single, language=C, caption={Create a new pcap handler.}, label=lst:open_live]
 handle = pcap_open_live(dev, SNAP_LEN, 0, 1000, errbuf);
 \end{lstlisting}
-Another important step is to compile the filter expression. 
+Another important step is to compile the filter expression and to associate it to the pcap handle.
 \begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to compile the filter expression and to set it.]
 pcap_compile(handle, &fp, filter_expression, 0, net);
 pcap_setfilter(handle, &fp);
 \end{lstlisting}
 
-A fundamental function is the \lstinline|pcap_loop|. The parameters are the pcap object,
-the num of packets (-1 for infinity) a callback function that is called each time a packet
+
+
+A fundamental function is \lstinline|pcap_loop|.
+The parameters are the pcap object,
+the number of packets (-1 for infinity) a callback function that is called each time a packet
 is got and the last is usually set as NULL, but it can be used to pass extra arguments for the
 callback function.
-
-\begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to start getting the packets on the network (Error handling omitted).]
+Thanks to this function the program enters in a loop and begins to catch packets and processing them using the callback function.
+\begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to start getting the packets on the network.]
 pcap_loop(handle, num_packets, got_packet, NULL);
+\end{lstlisting}
+The function \lstinline|got_packets| is the core of the implementation: Inside this function the packets are processed.
+The first step is to cast the packet in the struct \lstinline|sniff_ip| defined in the file \path{includes/important_header.h}.
+The source address is read from the packet and saved in a variable. According to the packet type the counters of the 
+nodes, structure that contains the information about the potential attackers are actualised.
+
+\begin{lstlisting}[frame=single, language=C, caption=The \lstinline|got_packet| function.]
+void got_packet(u_char *args, const struct pcap_pkthdr *header, 
+				const u_char *packet) {
+	...
+	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
+	...
+	tmp = inet_ntoa(ip->ip_src);
+	actual_adress = malloc((strlen(tmp)+1) * sizeof(char));
+	strcpy(actual_adress, tmp);
+	
+	actual_node = contains_node(head, actual_adress);
+	if(actual_node == NULL){ //First packet of this source ip
+		push(&head, actual_adress);
+		actual_node = contains_node(head, actual_adress);
+		/* Pthread started -> checks the score each 300ms */
+		if(pthread_create(&actual_node->thread, NULL, thread_function, 
+							actual_node) != 0){
+			//Error Handling
+		}	
+	}
+	...
+	switch(ip->ip_p) {
+		case IPPROTO_TCP:
+			actual_node->tcp[INDEX_TCP]++;
+			process_tcp(packet, ip, size_ip, actual_node);
+		break;
+		case IPPROTO_UDP:
+			actual_node->udp++;
+			process_udp(packet, ip, size_ip, actual_node);
+		return;
+			case IPPROTO_ICMP:
+			actual_node->icmp++;
+			return;
+		case IPPROTO_IP:
+			actual_node->ip++;
+			return;
+		default:
+			actual_node->unknown++;
+			return;
+	} 
+
+}
+\end{lstlisting}
+The packet is cast to tcp and the destination port is read. Depending on the flags
+the type of tcp packet is recognized and the score is actualized using the principle described in
+section \ref{subsec:detector:theory}
+\begin{lstlisting}[frame=single]
+void process_tcp(const u_char *packet, const struct sniff_ip *ip,
+	 int size_ip, node_t * actual_node){
+	...
+	tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+	...
+	dst_port = ntohs(tcp->th_dport);
+	if(tcp->th_flags == get_syn_scan_flags()){
+		index = INDEX_SYN;
+		printf("SYN\n");
+	} else if(tcp->th_flags == get_ack_scan_flags()){
+		index = INDEX_ACK;
+		printf("ACK\n");
+	} else if(tcp->th_flags == get_null_scan_flags()){
+		index = INDEX_NULL;
+		printf("NULL\n");
+	} else if(tcp->th_flags == get_xmas_scan_flags()){
+		index = INDEX_XMAS;
+		printf("XMAS\n");
+	} else if(tcp->th_flags == get_fin_scan_flags()){
+		index = INDEX_FIN;
+		printf("FIN\n");
+	} else if(tcp->th_flags == get_maimon_scan_flags()){
+		index = INDEX_MAIMON;
+		printf("MAIMON (FIN | ACK)\n");
+	}
+	else {
+		index = INDEX_UNKNOWN;
+		printf("Not known scan type (Flag set to 0x%X := ", tcp->th_flags);
+		print_tcp_flags(tcp->th_flags);
+		printf(")\n");
+	}
+	...
+	int tmp = get_score(dst_port);
+	actual_node->tcp_actual_score[INDEX_TCP] += tmp;
+	actual_node->tcp_total_score[INDEX_TCP] += tmp;
+	actual_node->tcp_actual_score[index] += tmp;
+	actual_node->tcp_total_score[index] += tmp;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[frame=single, caption=Node struct containing the information about the potential attackers]
+typedef struct node {
+unsigned int ip; 			/* Counter of ip packets that are not udp, nor icmp, nor tcp */
+unsigned int icmp; 			/* Counter of ICMP packets */
+unsigned int unknown; 		/* Counter of packets with unknown protocol */
+
+
+
+/* TCP PROTOCOL PLACE HOLDERS */
+unsigned int tcp_actual_score[INDEX_SIZE]; 	/* actual_score: each 300 ms is reset to 0 */
+unsigned int tcp_total_score[INDEX_SIZE]; 
+unsigned int tcp_scan_detected[INDEX_SIZE]; /* counter of detected scans */
+unsigned int tcp[INDEX_SIZE]; 			/* Counter of tcp packets received from  the ip_src */
+
+
+
+/* UDP PROTOCOL PLACE HOLDERS */
+unsigned int udp_actual_score; 	/* UDP is slower I will check it only after a while(300ms*10?)  */
+unsigned int udp_total_score; 
+unsigned int udp; 			/* Counter of tcp packets */
+unsigned int udp_scan_detected;
+
+
+time_t init_time;
+time_t end_time;
+pthread_t thread;
+my_port * tcp_port_list;
+my_port * udp_port_list;
+char * ip_src;
+struct node *next;
+}node_t;
+\end{lstlisting}
+
+\begin{lstlisting}[frame=single]
+void controlScore(node_t * n){
+	int i;
+	int tot_detected = 0;
+	for(i = 0; i < INDEX_SIZE; i++){
+		if(n->tcp_actual_score[i] >= PORT_SCAN_SCORE){
+			printf("*** %7s TCP SCAN FROM %s dectected\n",
+						index_to_string(i), n->ip_src);
+			n->tcp_scan_detected[i]++;
+			tot_detected++;
+		}
+		n->tcp_actual_score[i] = 0;
+	}
+	if(n->udp_actual_score >= PORT_SCAN_SCORE){
+		printf("=== UDP SCAN FROM %s ===\n", n->ip_src);
+		n->udp_scan_detected++;
+	}
+	n->udp_actual_score = 0;
+}
+
+/** function passed to pthread_create() 
+* Each _my_time (default 300 ms) check the
+* "score" of the given node (source ip)
+*/
+void * thread_function(void * _node){	
+	node_t * n = (node_t *) _node;
+	while(!break_thread){
+		if(nanosleep(&_my_time, NULL) != 0){
+		perror("Nanosleep():");	
+		break;
+	}
+	controlScore(n);
+	}
+	return NULL;
+}
+\end{lstlisting}
+
+
+In order to stop the loop the function \lstinline|pcap_breakloop()| has to be called.
+In the implementation this function is called in the SIGINT (Ctrl-C) handler \lstinline|my_sigint_handler()| as shown
+in listing \ref{lst:detector:sigint}. This function stop the loop and cause the stop of all the threads.
+\begin{lstlisting}[frame=single, language=C, caption=Handler that process the SIGINT signal., label=lst:detector:sigint]
+void my_sigint_handler(int d){
+	pcap_breakloop(handle);
+	break_thread = true;
+}
 \end{lstlisting}
 
 
