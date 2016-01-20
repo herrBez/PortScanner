@@ -1,13 +1,15 @@
 \chapter{Port Scannner}
-
-\section{Demo Description}
-
+According to the Techopedia~\cite{techopedia} port scanning is defined as follows:
+\begin{quote}
+	Port scanning refers to the surveillance of computer ports, most often by hackers for malicious purposes. Hackers conduct port-scanning techniques in order to locate holes within specific computer ports. For an intruder, these weaknesses represent opportunities to gain access for an attack. 
+\end{quote}
 
 \section{TCP connect scan}
-
+This section gives a short overview of the theory behind TCP connect scans and afterwards describes some interesting details about our implementation
+of this technique. 
 \label{sec:connect}
 \subsection{Theory}
-The TCP connect scan is probably the most easy method to scan for open ports. It simply takes advantage of the system call
+The TCP connect scan is probably the simplest method to scan for open ports. It simply takes advantage of the system call
 ~\lstinline|connect| of the underlying operating system, in order to establish a connection with the target machine and port. Afterwards the
 returned value of the system call is used to determine if the port to check is either closed or open at the target machine~\cite{nmap2009}.
 
@@ -42,7 +44,11 @@ mysocket = socket(AF_INET, SOCK_STREAM, 0);
 
 \section{TCP SYN scan}
 \label{sec:syn}
+This section is concerned with the TCP SYN scan. First it describes the theory behind such scans and afterwards follows a description about interesting details of our implementation.
 \subsection{Theory}
+The TCP SYN scan is often also called half-open-scanning, because it does not open a full TCP connection. The first step of this technique is to send a SYN packet, just like if you are
+going to open a real connection and then wait for a response. Afterwards the response will be processed. A SYN/ACK means that the port is listening (open), while a RST (reset) will indicate
+that the port is close. If no response is received the port will be marked as filtered~\cite{nmap2009}. 
 
 
 
@@ -52,11 +58,11 @@ every section of the packets that will be sent. The function socket(), as shown 
 \begin{lstlisting}[frame= single, language=C, caption= C code to use the connect() to check if port is open]
 int mysocket=socket(AF_INET, SOCK_RAW,  IPPROTO_TCP);
 \end{lstlisting}
-Before we can send a syn request to the target machine, we have to build the packet to be sent. To send packets with a raw socket the function sendto() is used.
+Before we can send a SYN request to the target machine, we have to build the packet to be sent. To send packets with a raw socket the function sendto() is used.
 It's second parameter is a pointer to the message to be sent, which 
-is the packet that we build. It consists of the TCP theader, the ip header and the data
-to be sent. As we only want to send a syn request we don't care about the data, therefore it is empty. We start building the packet by filling in the IP-Header. We don't need optional fields therefore the we use the minimal size possible size of the ip header which is 160 Bits (5*32 Bits). We use the ip version 4, which is still the most widely used ip version. The length of our packet
-is the sum of the length of the ip header and the length of the TCP header. For the time to live we choose 64, which should be big enough
+is the packet that we build. It consists of the TCP header, the ip header and the data
+to be sent. As we only want to send a SYN request we don't care about the data, therefore it is empty. We start building the packet by filling in the IP-Header. We don't need optional fields therefore the we use the minimal size possible size of the ip header which is 160 Bits (5*32 Bits). We use the ip version 4, which is still the most widely used ip version. The length of our packet
+is the sum of the length of the IP header and the length of the TCP header. For the time to live we choose 64, which should be big enough
 fur our purpose. As transfer protocol we set the TCP protocol. The source address of the ip header is set to the ip address of the scanning system and the destination address is set to the address of the target system to scan. To have a complete ip header we also
 have to calculate its check sum.
 \begin{lstlisting}[frame= single, language=C, caption= C code to fill in ip header]
@@ -132,15 +138,43 @@ if(tcph->syn == 1 && tcph->ack == 1){
 printf("Port: %d is open\n", port);
 } 
 \end{lstlisting}
-\section{XMAS, TCP NULL and FIN scan}
+\section{XMAS, TCP NULL, FIN and Maimon scan}
 \label{sec:xmas}
+This section is about the scan methods XMAS, TCP NULL, FIN and Maimon scan. The first part describes the theory behind them and in the second part we will describe some details of our implementation.
 \subsection{Theory}
+The XMAS, NULL and FIN scan exploit a subtle loophole found in the TCP RFC 793 to distinguish between open and closed ports. Page 65 of the RFC states that
+"if the [destination] port state is CLOSED .... an incoming segment not containing a RST causes a RST to be sent in response." The next pages discusses the behaviour if packets are sent to open ports
+without the SYN, RST, or ACK bits set. It states that: "you are unlikely to get here, but if you do, drop the segment, and return." 
+
+
 
 \subsection{Details of implementation}
 The implementation of the XMAS, TCP NULL and FIN scan is quiet similar to the implementation of the syn scanner. In fact these four scan methods have very much in common.
 They all need a raw socket to work. There are only 2 main differences between this scan methods and the syn scan. The first one is that XMAS, NULL and FIN scan set different flags
 in the TCP header. As the name suggests the NULL scan sets none of the flags and the FIN scan only sets the FIN flag. The XMAS scan sets the FIN, PSH, and URG flags, lighting the packet up like a Christmas tree.
-The second difference of this three scan methods to the syn method is how the answer to the request is used to determine if a port is open or not. If we get a packet with the RST flag as an answer of one
+The second difference of this three scan methods to the SYN method is how the answer to the request is used to determine if a port is open or not. If we get a packet with the RST flag as an answer of one
 of this three scan methods, we know the port is closed. If we don't get an answer we know that the server must have dropped the packet because of an illegal request (RFC 793).
+
+\section{Demo Description}
+The help page seen in listing gives all necessary information to use the port scanner. It lists all available options and 
+the default values in case the options are not specified.
+
+\begin{lstlisting}[frame= single, language=bash, caption=Help page of port scanner]
+Usage: ./portscanner [options]
+Options:
+
+-h 	 print this help page and exit
+-p 	 specify a port range in form min-max (Defualt 1-1023)
+-u 	 specify an URL to scan (Default localhost)
+-v 	 verbose output
+-s 	 perform a SYN scan
+-n 	 perform a NULL scan
+-f 	 perform a FIN scan
+-x 	 perform a XMAS scan
+-m 	 perform a Maimon scan
+\end{lstlisting}
+
+The standard scan method of the port scanner is the TCP connect scan, which will be used, if the user does not select any other method.
+The option~\lstinline|-p| allows to set the port range to scan. By using the option~\lstinline|-u| the user can 
 
 		
