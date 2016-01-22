@@ -7,10 +7,24 @@
 \usepackage{tabularx}
 %\usepackage{todonotes}
 \usepackage{listings}
+\usepackage{color}
+
+\definecolor{orange}{RGB}{255,127,0}
+
 \lstset{ 
 	captionpos=b,
 	basicstyle=\small\ttfamily,
 	tabsize=2,
+}
+
+\lstdefinestyle{MyC} {
+	language=C, 
+	frame=single
+	basicstyle=\small\ttfamily,
+	keywordstyle=\color{blue}\small\ttfamily,
+	stringstyle=\color{orange}\small\ttfamily,
+	commentstyle=\color{red}\small\ttfamily,
+	morecomment=[l][\color{magenta}]{\#},
 }
 %\usepackage[backend=bibtex]{biblatex}
 %\usepackage{fullpage}
@@ -74,8 +88,8 @@ led to inconsistent results. It may be better to choose a number of repetition t
 \label{sec:improve:detector}
 \begin{itemize}
 \item The port scan detector currently uses only one network interface. It may be also interesting to have an option to use more network interfaces simultaneously.
-\item Currently the detector takes the IP address of the interface as an command line argument. In make it more user-friendly the IP address could be determined at runtime.
-\item In order to distinguish between a TCP connect and SYN scan techniques could be implemented to recognizes a complete handshake.
+\item Currently the detector takes the IP address of the interface as a command line argument. In order to make it more user-friendly the IP address could be determined at runtime.
+\item In order to distinguish between a TCP connect and SYN scan techniques could be implemented to recognize a complete handshake.
 \item Implementation of other port scan detection approaches.
 	
 

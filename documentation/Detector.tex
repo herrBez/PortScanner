@@ -60,19 +60,20 @@ Port 12 is not associated to any service and attacks but its importance is proba
 
 \subsection{Details of implementation}
 The implementation of the Port Scan Detector is largely based on the use of the tcpdump's pcap library
-and on a good example given by tcpdump self~\cite{pcaptcpdump}.
-This library is used by tcpdump and wireshark in order to get  the packets on the network and choose 
-which packets to sniff and which to ignore by using filter expression such as \lstinline!dst host 192.168.0.1! and \lstinline!dst portrange 1-1024!
-or a combination of those rules~\cite{pcapFilterRules}.
+and on a good example given by tcpdump~\cite{pcaptcpdump}.
+This library is used by tcpdump and wireshark in order to get  the packets on the network.
+Pcap gives the possibility to choose which packets to sniff and which to ignore by using filter expression 
+such as \lstinline!dst host 192.168.0.1! and \lstinline!dst portrange 1-1024! or a combination of those rules~\cite{pcapFilterRules}.
 
 
 
 In order to start a capture session the program has to create a new pcap object using the \lstinline!pcap_open_live! function:
-\begin{lstlisting}[frame= single, language=C, caption={Create a new pcap handler.}, label=lst:open_live]
+\begin{lstlisting}[style=MyC, caption={Create a new pcap handler.}, label=lst:open_live]
 handle = pcap_open_live(dev, SNAP_LEN, 0, 1000, errbuf);
 \end{lstlisting}
 Another important step is to compile the filter expression and to associate it to the pcap handle.
-\begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to compile the filter expression and to set it.]
+\begin{lstlisting}[style=MyC, caption=Pcap functions called to compile the filter expression and to set it.]
+sprintf(filter_expression, "dst host %s", dst_ip);
 pcap_compile(handle, &fp, filter_expression, 0, net);
 pcap_setfilter(handle, &fp);
 \end{lstlisting}
@@ -81,89 +82,106 @@ pcap_setfilter(handle, &fp);
 
 A fundamental function is \lstinline|pcap_loop|.
 The parameters are the pcap object,
-the number of packets (-1 for infinity) a callback function that is called each time a packet
-is got and the last is usually set as NULL, but it can be used to pass extra arguments for the
+the number of packets (0 or a negative number for infinity), a callback function
+ that is called each time a packet
+is got and the last argument is usually set as NULL, but it can be used to pass extra arguments for the
 callback function.
-Thanks to this function the program enters in a loop and begins to catch packets and processing them using the callback function.
+Thanks to this function the program enters in a loop and begins to catch packets and process them using the callback function.
 \begin{lstlisting}[frame= single, language=C, caption=Pcap functions called to start getting the packets on the network.]
 pcap_loop(handle, num_packets, got_packet, NULL);
 \end{lstlisting}
 The function \lstinline|got_packets| is the core of the implementation: Inside this function the packets are processed.
-The first step is to cast the packet in the struct \lstinline|sniff_ip| defined in the file \path{includes/important_header.h}.
-The source address is read from the packet and saved in a variable. According to the packet type the counters of the 
-nodes, structure that contains the information about the potential attackers are actualised.
 
-\begin{lstlisting}[frame=single, language=C, caption=The \lstinline|got_packet| function.]
+\begin{lstlisting}[style=MyC]
 void got_packet(u_char *args, const struct pcap_pkthdr *header, 
-				const u_char *packet) {
+const u_char *packet) {
 	...
 	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-	...
-	tmp = inet_ntoa(ip->ip_src);
-	actual_adress = malloc((strlen(tmp)+1) * sizeof(char));
-	strcpy(actual_adress, tmp);
-	
+\end{lstlisting}
+
+The first step is to cast the packet in the structure \lstinline|sniff_ip| defined in the file \path{includes/important_header.h}.
+The source address is read from the packet and used to check if the packet comes from a known source. If it is not the 
+case the source ip is added to the list and a thread is started.
+
+\begin{lstlisting}[style=MyC]
 	actual_node = contains_node(head, actual_adress);
 	if(actual_node == NULL){ //First packet of this source ip
 		push(&head, actual_adress);
 		actual_node = contains_node(head, actual_adress);
-		/* Pthread started -> checks the score each 300ms */
-		if(pthread_create(&actual_node->thread, NULL, thread_function, 
-							actual_node) != 0){
-			//Error Handling
-		}	
+		pthread_create(&actual_node->thread, NULL, thread_function, 
+						actual_node);
 	}
-	...
+\end{lstlisting}
+
+
+According to the packet's protocol the counters of the \lstinline|actual_node|
+are actualised and in case of a TCP or UDP packet the function \lstinline|process_tcp| and 
+\lstinline|process_udp| are called. Because the UDP callback function is very similar to the 
+TCP one only the latter one is described.
+\begin{lstlisting}[style=MyC, caption=The \lstinline|got_packet| function.]
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
 			actual_node->tcp[INDEX_TCP]++;
 			process_tcp(packet, ip, size_ip, actual_node);
-		break;
+			break;
 		case IPPROTO_UDP:
 			actual_node->udp++;
 			process_udp(packet, ip, size_ip, actual_node);
-		return;
-			case IPPROTO_ICMP:
+			break;
+		case IPPROTO_ICMP:
 			actual_node->icmp++;
-			return;
+			break;
 		case IPPROTO_IP:
 			actual_node->ip++;
-			return;
+			break;
 		default:
 			actual_node->unknown++;
-			return;
+			break;
 	} 
-
-}
 \end{lstlisting}
-The packet is cast to tcp and the destination port is read. Depending on the flags
-the type of tcp packet is recognized and the score is actualized using the principle described in
-section \ref{subsec:detector:theory}
-\begin{lstlisting}[frame=single]
+The packet is cast to TCP, the destination port is read and 
+the score for the port is saved in the variable \lstinline|tmp|. 
+\begin{lstlisting}[style=MyC]
 void process_tcp(const u_char *packet, const struct sniff_ip *ip,
-	 int size_ip, node_t * actual_node){
+	int size_ip, node_t * actual_node){
 	...
 	tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
 	...
 	dst_port = ntohs(tcp->th_dport);
+	int tmp = get_score(dst_port);
+\end{lstlisting}
+The score is actualized using the principle described in
+section \ref{subsec:detector:theory}
+\begin{lstlisting}[style=MyC]
+int get_score(int dst_port){
+	if((dst_port >= 11 && dst_port <= 13) || dst_port == 2000)
+		return 10;
+	else if(dst_port < 1024)
+		return 3;
+	else if(dst_port >= 1024)
+		return 1;
+	return 0;
+}
+\end{lstlisting}
+
+
+
+Depending on the flags
+the type of TCP packet is recognized and both the counters for the different
+packets and the score for the different scan types are actualized.
+\begin{lstlisting}[style=MyC]
 	if(tcp->th_flags == get_syn_scan_flags()){
-		index = INDEX_SYN;
-		printf("SYN\n");
+		index = INDEX_SYN; printf("SYN\n");
 	} else if(tcp->th_flags == get_ack_scan_flags()){
-		index = INDEX_ACK;
-		printf("ACK\n");
+		index = INDEX_ACK; printf("ACK\n");
 	} else if(tcp->th_flags == get_null_scan_flags()){
-		index = INDEX_NULL;
-		printf("NULL\n");
+		index = INDEX_NULL; printf("NULL\n");
 	} else if(tcp->th_flags == get_xmas_scan_flags()){
-		index = INDEX_XMAS;
-		printf("XMAS\n");
+		index = INDEX_XMAS; printf("XMAS\n");
 	} else if(tcp->th_flags == get_fin_scan_flags()){
-		index = INDEX_FIN;
-		printf("FIN\n");
+		index = INDEX_FIN; printf("FIN\n");
 	} else if(tcp->th_flags == get_maimon_scan_flags()){
-		index = INDEX_MAIMON;
-		printf("MAIMON (FIN | ACK)\n");
+		index = INDEX_MAIMON; printf("MAIMON (FIN | ACK)\n");
 	}
 	else {
 		index = INDEX_UNKNOWN;
@@ -171,8 +189,6 @@ void process_tcp(const u_char *packet, const struct sniff_ip *ip,
 		print_tcp_flags(tcp->th_flags);
 		printf(")\n");
 	}
-	...
-	int tmp = get_score(dst_port);
 	actual_node->tcp_actual_score[INDEX_TCP] += tmp;
 	actual_node->tcp_total_score[INDEX_TCP] += tmp;
 	actual_node->tcp_actual_score[index] += tmp;
@@ -180,40 +196,19 @@ void process_tcp(const u_char *packet, const struct sniff_ip *ip,
 }
 \end{lstlisting}
 
-\begin{lstlisting}[frame=single, caption=Node struct containing the information about the potential attackers]
-typedef struct node {
-unsigned int ip; 			/* Counter of ip packets that are not udp, nor icmp, nor tcp */
-unsigned int icmp; 			/* Counter of ICMP packets */
-unsigned int unknown; 		/* Counter of packets with unknown protocol */
-
-
-
-/* TCP PROTOCOL PLACE HOLDERS */
-unsigned int tcp_actual_score[INDEX_SIZE]; 	/* actual_score: each 300 ms is reset to 0 */
-unsigned int tcp_total_score[INDEX_SIZE]; 
-unsigned int tcp_scan_detected[INDEX_SIZE]; /* counter of detected scans */
-unsigned int tcp[INDEX_SIZE]; 			/* Counter of tcp packets received from  the ip_src */
-
-
-
-/* UDP PROTOCOL PLACE HOLDERS */
-unsigned int udp_actual_score; 	/* UDP is slower I will check it only after a while(300ms*10?)  */
-unsigned int udp_total_score; 
-unsigned int udp; 			/* Counter of tcp packets */
-unsigned int udp_scan_detected;
-
-
-time_t init_time;
-time_t end_time;
-pthread_t thread;
-my_port * tcp_port_list;
-my_port * udp_port_list;
-char * ip_src;
-struct node *next;
-}node_t;
+As already mentioned for each different source IP a thread is started.
+\begin{lstlisting}[style=MyC]
+void * thread_function(void * _node){	
+	node_t * n = (node_t *) _node;
+	while(!break_thread){
+		nanosleep(&_my_time, NULL); //Wait 300 ms
+		controlScore(n);
+	}
+	return NULL;
+}
 \end{lstlisting}
 
-\begin{lstlisting}[frame=single]
+\begin{lstlisting}[style=MyC]
 void controlScore(node_t * n){
 	int i;
 	int tot_detected = 0;
@@ -232,29 +227,13 @@ void controlScore(node_t * n){
 	}
 	n->udp_actual_score = 0;
 }
-
-/** function passed to pthread_create() 
-* Each _my_time (default 300 ms) check the
-* "score" of the given node (source ip)
-*/
-void * thread_function(void * _node){	
-	node_t * n = (node_t *) _node;
-	while(!break_thread){
-		if(nanosleep(&_my_time, NULL) != 0){
-		perror("Nanosleep():");	
-		break;
-	}
-	controlScore(n);
-	}
-	return NULL;
-}
 \end{lstlisting}
 
 
 In order to stop the loop the function \lstinline|pcap_breakloop()| has to be called.
 In the implementation this function is called in the SIGINT (Ctrl-C) handler \lstinline|my_sigint_handler()| as shown
 in listing \ref{lst:detector:sigint}. This function stop the loop and cause the stop of all the threads.
-\begin{lstlisting}[frame=single, language=C, caption=Handler that process the SIGINT signal., label=lst:detector:sigint]
+\begin{lstlisting}[style=MyC, caption=Handler that process the SIGINT signal., label=lst:detector:sigint]
 void my_sigint_handler(int d){
 	pcap_breakloop(handle);
 	break_thread = true;
@@ -265,8 +244,6 @@ void my_sigint_handler(int d){
 
 \section{Demo Description}
 In listing \ref{lst:detector:help} the options of the port scan detector are described.
-
-
 \begin{lstlisting}[frame=single, language=BASH, label=lst:detector:help, caption=Help page of the port scan detector.]
 Usage: ./port_scan_detector [options]
 Options:
@@ -277,7 +254,7 @@ Options:
 -s	save all the tcp ports requested from the potential attackers
 --device
 -d	specify a device to use (e.g. wlan0). 
-you can get those devices using the command ifconfig
+	  you can get those devices using the command ifconfig
 --verbose
 -v	verbose output
 --dst-ip
@@ -291,7 +268,17 @@ If the user does not specify any option the default behaviour is used:
 The destination IP is set to 127.0.0.1 and the network interface to lo. Only
 the packets sent from localhost can be caught and processed.
 
-If the user set the option \lstinline{-s} 
+If the user set the option \lstinline|-s| the program takes track of how many times
+each potential attacker which UDP or TCP port visit.
+
+Thanks to the option \lstinline|-m| the user can set the maximum number of packets to get, after which the programs end.
+
+The option \lstinline|-l| save all the information in a \LaTeX{} file.
+
+A known issue with the program is that if the user set the option \lstinline|-i| he or she have also to set the option \lstinline|-d|.
+
+After the start of the program the information about the single packets and the scan detected are printed on the terminal. The program can be ended either by clicking Ctrl-C or by waiting the reach of the num packets (It can happen only if the option m is set or an error occurred). If the program is ended gracefully it prints a summary of what happened
+during the capture session.
 
 
 
