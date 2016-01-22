@@ -197,6 +197,9 @@ packets and the score for the different scan types are actualized.
 \end{lstlisting}
 
 As already mentioned for each different source IP a thread is started.
+This thread waits 300 milliseconds and then check the actual score for
+the different TCP/UDP scan types. If the actual score is bigger than
+21 a port scan is detected and a briefly message is output. 
 \begin{lstlisting}[style=MyC]
 void * thread_function(void * _node){	
 	node_t * n = (node_t *) _node;
@@ -206,9 +209,7 @@ void * thread_function(void * _node){
 	}
 	return NULL;
 }
-\end{lstlisting}
 
-\begin{lstlisting}[style=MyC]
 void controlScore(node_t * n){
 	int i;
 	int tot_detected = 0;
