@@ -4,7 +4,5 @@ The aim of this project is to create a simple portscanner, that tries to simulat
 This project is part of the course "Angewandte Informationssicherheit" at the university of Innsbruck.
 
 
-
-
 # Authors
 Simon Targa, Mirko Bez

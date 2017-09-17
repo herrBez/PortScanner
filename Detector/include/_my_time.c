@@ -1,13 +1,13 @@
 #include "_my_time.h"
 
-/* Function that return the actual time in form of a time_t */
+/* Function that returns the actual time in form of a time_t */
 time_t my_now(){
 	time_t rawtime;
 	time ( &rawtime );
 	return rawtime;
 }
 
-/* function that print the current local time */
+/* function that prints the current local time */
 void print_now(){
 	time_t rawtime;
 	struct tm * timeinfo;
